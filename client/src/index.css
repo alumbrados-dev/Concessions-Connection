@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --background: hsl(48, 100%, 97%);
+  --foreground: hsl(0, 0%, 17%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 17%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 17%);
+  --primary: hsl(15, 100%, 60%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(210, 50%, 35%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+  --muted: hsl(45, 20%, 92%);
+  --muted-foreground: hsl(0, 0%, 45%);
+  --accent: hsl(48, 100%, 62%);
+  --accent-foreground: hsl(0, 0%, 17%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(45, 20%, 85%);
+  --input: hsl(45, 20%, 85%);
+  --ring: hsl(15, 100%, 60%);
+  --chart-1: hsl(15, 100%, 60%);
+  --chart-2: hsl(159, 100%, 36%);
+  --chart-3: hsl(42, 92%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+  --sidebar: hsl(0, 0%, 100%);
+  --sidebar-foreground: hsl(0, 0%, 17%);
+  --sidebar-primary: hsl(15, 100%, 60%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(48, 100%, 62%);
+  --sidebar-accent-foreground: hsl(0, 0%, 17%);
+  --sidebar-border: hsl(45, 20%, 85%);
+  --sidebar-ring: hsl(15, 100%, 60%);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Poppins', system-ui, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+  --radius: 12px;
+  --shadow-2xs: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00);
+  --shadow-xs: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00);
+  --shadow-sm: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00), 0px 1px 2px -1px hsl(15, 100%, 60%, 0.00);
+  --shadow: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00), 0px 1px 2px -1px hsl(15, 100%, 60%, 0.00);
+  --shadow-md: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00), 0px 2px 4px -1px hsl(15, 100%, 60%, 0.00);
+  --shadow-lg: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00), 0px 4px 6px -1px hsl(15, 100%, 60%, 0.00);
+  --shadow-xl: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00), 0px 8px 10px -1px hsl(15, 100%, 60%, 0.00);
+  --shadow-2xl: 0px 2px 0px 0px hsl(15, 100%, 60%, 0.00);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+}
+
+.dark {
+  --background: hsl(0, 0%, 0%);
+  --foreground: hsl(0, 0%, 91%);
+  --card: hsl(228, 10%, 10%);
+  --card-foreground: hsl(0, 0%, 85%);
+  --popover: hsl(0, 0%, 0%);
+  --popover-foreground: hsl(0, 0%, 91%);
+  --primary: hsl(15, 100%, 60%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(210, 50%, 35%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+  --muted: hsl(0, 0%, 9%);
+  --muted-foreground: hsl(0, 0%, 46%);
+  --accent: hsl(48, 100%, 62%);
+  --accent-foreground: hsl(0, 0%, 17%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(210, 5%, 15%);
+  --input: hsl(207, 28%, 18%);
+  --ring: hsl(15, 100%, 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.voice-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.cart-bounce {
+  animation: bounce 0.5s;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8,0,1,1); }
+  50% { transform: none; animation-timing-function: cubic-bezier(0,0,0.2,1); }
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
