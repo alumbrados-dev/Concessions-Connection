@@ -1,0 +1,65 @@
+Category banners
+
+    * Each category shows a responsive banner above the items:
+        * Desktop: <Category>_web.png (ACTIVE folder)
+
+        * Mobile: <Category>_mobile.png (ACTIVE folder)
+    * If a banner image fails to load, it is hidden automatically.
+
+One-page layout overview
+
+    * Single-page layout with a hero at top, then About Us, then Menu sections, then a Local Events stub, then a bottom-right persistent warning image (not
+floating).
+    * Hero:
+        * 1Connect4 image pinned on the far left (desktop), vertically centered
+
+        * Hamburger menu button (three horizontal bars) pinned on the far right (desktop), clearly visible (high z-index)
+
+        * Center hero image (1Concessions.png)
+
+        * Just below hero, 1Linking.png centered (hero subtitle image)
+    * Hamburger menu (desktop & mobile):
+        * About App (modal with Download popup; About App shows UX/UI Design @alumbrados.dev)
+
+        * Menu (smooth scroll to the Menu section)
+
+        * Local Events (navigates to /events)
+
+        * Admin (navigates to /admin)
+
+        * “Who We Are” is intentionally removed from the menu, but the About Us section remains on the page (by your request).
+    * About Us section:
+        * Body copy describing Concessions Connection
+
+        * Quoted tagline: “…Linking Families through tastes and experience.”
+
+        * “Our Difference” bullet list
+
+        * “Join the Connection” paragraph
+
+        * Hours of Operation (Tuesday–Sunday, 11 AM–8 PM; configured later by Admin)
+
+        * GPS card:
+
+            * Shows “We are currently offline” if GPS is disabled
+
+
+            * Shows “Current Location: <text>” if enabled and a location is set
+
+
+            * “Location temporarily unavailable” if enabled but no string is present
+
+        * Note: GPS is intentionally in About Us, not in Events (per your plan)
+    * Local Events (separate page /events):
+        * Clean scaffold “Local Events – Coming Soon”
+
+        * This is a separate route ready for your future geo-fencing + Google APIs (DMV/Baltimore, etc.)
+    * Warning image:
+        * Persistent, non-floating image at the bottom-right of the page (larger size, no border)
+    * Styling:
+        * Card-based sections with rounded corners and subtle shadows
+
+        * Deep orange as the accent color (headers, prices, buttons)
+
+        * Clean, accessible typography and spacing
+

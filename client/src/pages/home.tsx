@@ -57,10 +57,9 @@ export default function Home() {
 
   const categories = [
     { id: "all", name: "All Items" },
-    { id: "starters", name: "Starters" },
+    { id: "starters", name: "Starters & Snacks" },
     { id: "grill", name: "Off the Grill" },
     { id: "drinks", name: "Refreshments" },
-    { id: "sides", name: "Fries & Sides" },
     { id: "extras", name: "Extras" },
   ];
 

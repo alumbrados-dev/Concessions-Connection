@@ -8,7 +8,7 @@ interface MenuItemsProps {
 }
 
 export default function MenuItems({ items }: MenuItemsProps) {
-  const { items: cartItems, updateQuantity } = useCart();
+  const { items: cartItems, updateQuantity, addItem } = useCart();
 
   const getCartQuantity = (itemId: string) => {
     const cartItem = cartItems.find(item => item.id === itemId);
@@ -18,7 +18,16 @@ export default function MenuItems({ items }: MenuItemsProps) {
   const handleQuantityChange = (item: Item, delta: number) => {
     const currentQuantity = getCartQuantity(item.id);
     const newQuantity = Math.max(0, currentQuantity + delta);
-    updateQuantity(item.id, newQuantity);
+    
+    if (newQuantity === 0) {
+      updateQuantity(item.id, 0); // This will remove the item
+    } else if (currentQuantity === 0) {
+      // Item is not in cart yet, so add it
+      addItem(item, newQuantity);
+    } else {
+      // Item exists in cart, update quantity
+      updateQuantity(item.id, newQuantity);
+    }
   };
 
   const getStockStatus = (stock: number) => {
@@ -72,7 +81,7 @@ export default function MenuItems({ items }: MenuItemsProps) {
                     {item.name}
                   </h3>
                   <span 
-                    className="text-lg font-bold text-primary" 
+                    className="text-lg font-bold text-orange-600 dark:text-orange-500" 
                     data-testid={`text-item-price-${item.id}`}
                   >
                     ${item.price}
@@ -89,14 +98,26 @@ export default function MenuItems({ items }: MenuItemsProps) {
                 )}
                 
                 <div className="flex items-center justify-between">
-                  <Badge 
-                    variant={stockStatus.color as any}
-                    className="flex items-center space-x-1"
-                    data-testid={`badge-stock-${item.id}`}
-                  >
-                    <div className={`w-2 h-2 rounded-full ${stockStatus.dot}`}></div>
-                    <span>{stockStatus.text}</span>
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge 
+                      variant={stockStatus.color as any}
+                      className="flex items-center space-x-1"
+                      data-testid={`badge-stock-${item.id}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${stockStatus.dot}`}></div>
+                      <span>{stockStatus.text}</span>
+                    </Badge>
+                    
+                    {!item.available && (
+                      <Badge 
+                        variant="secondary"
+                        className="text-xs"
+                        data-testid={`badge-unavailable-${item.id}`}
+                      >
+                        Currently Unavailable
+                      </Badge>
+                    )}
+                  </div>
                   
                   <div className="flex items-center space-x-3">
                     <Button
@@ -110,18 +131,19 @@ export default function MenuItems({ items }: MenuItemsProps) {
                       <i className="fas fa-minus text-xs"></i>
                     </Button>
                     
-                    <span 
-                      className="font-medium w-8 text-center" 
+                    <Badge 
+                      variant="outline"
+                      className="w-8 h-6 flex items-center justify-center font-medium" 
                       data-testid={`text-quantity-${item.id}`}
                     >
                       {quantity}
-                    </span>
+                    </Badge>
                     
                     <Button
                       size="sm"
                       className="w-8 h-8 rounded-full p-0"
                       onClick={() => handleQuantityChange(item, 1)}
-                      disabled={item.stock <= 0}
+                      disabled={item.stock <= 0 || !item.available}
                       data-testid={`button-increase-${item.id}`}
                     >
                       <i className="fas fa-plus text-xs"></i>

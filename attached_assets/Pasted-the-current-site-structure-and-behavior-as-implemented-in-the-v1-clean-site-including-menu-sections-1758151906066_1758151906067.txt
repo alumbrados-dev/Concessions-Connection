@@ -1,0 +1,121 @@
+the current site structure and behavior as implemented in the v1 clean site, including menu sections, items, quantity controls, and the
+one-page layout details.
+
+Menu sections and items
+
+    * Starters & Snacks
+
+
+        * Jumbo Pretzel — $4.00
+
+            * Warm, salted/unsalted pretzels, nacho cheese or mustard
+
+        * Mozzarella Sticks (6) — $7.00
+
+            * Served with marinara for dipping
+
+        * Nachos — $7.00
+
+            * Corn chips topped with nacho cheese (salsa & jalapeños optional)
+
+        * French Fries — $4.00
+
+            * Plain or Old Bay seasoned
+
+        * Chippin’ Apple Dippers — $9.00
+
+            * Cinnamon pita chips, fresh apples, caramel drizzle
+    * Off the Grill
+
+
+        * Sliders (3) — $12.00
+
+        * Sliders (6) — $22.00
+
+        * Sliders (12) — $32.00
+
+            * Horsemon Farm 100% Angus beef sliders; cheese optional; lettuce, tomato, onion; mini buns
+
+        * Hot Dog — $4.00
+
+            * Sabrett 100% beef with that “snap”
+
+        * Cheese Steak Sandwich — $9.00
+
+            * Rib-eye chip steak, provolone, sautéed onions & peppers, hoagie roll
+
+        * Chicken Cheese Sandwich — $9.00
+
+            * Chicken tenders, provolone, sautéed onions & peppers, hoagie roll
+
+        * Chicken Tenders (3) & Fries — $9.00
+
+            * Tenderloins with plain or seasoned fries
+
+        * Gyro — $9.00
+
+            * Lamb in pita, feta, tomatoes, onions, tzatziki
+    * Refreshments
+
+
+        * Lemonade (32 oz.) — $8.00
+
+            * Fresh-squeezed; optional strawberry/raspberry/blueberry purees
+
+        * Apple Cider — $4.00
+
+            * Martinelli’s, cold or warm
+
+        * Bottled Water — $2.00
+
+            * Deer Park spring water
+
+        * Can, Bottle, & Boxed Drinks — $2.00
+
+            * Coke, Diet/Zero, Sprite, Fanta Orange, Juicy Juice
+
+        * Gatorade — $3.00
+
+            * Assorted flavors
+
+        * Note: Coffee should no longer appear; Gatorade replaces it
+    * Extras
+
+
+        * Garden Salad — $7.00
+
+            * Mixed greens, cucumbers, carrots, grape tomatoes
+
+        * Cool Wrap — $7.00
+
+            * Chicken, romaine, parmesan, croutons
+
+        * Potato Chips — $1.50
+
+            * Assorted UTZ chips
+
+        * Caesar Salad — $7.00
+
+            * Crisp romaine, parmesan, croutons, Caesar dressing
+
+Quantity counter and item layout
+
+    * Each menu item is rendered as a card showing:
+        * Name (bold)
+
+        * Description (muted, smaller text)
+
+        * Price (highlighted in deep orange)
+
+        * Quantity control:
+
+            * “-” button: disabled at 0; decrements quantity by 1 when > 0
+
+
+            * Quantity badge: displays the current count
+
+
+            * “+” button: increments quantity by 1 (disabled if item is marked unavailable)
+    * Quantity state is stored in-memory while you stay on the page (no backend or cart persistence yet).
+    * If an item is marked unavailable, the control disables and a small “Currently Unavailable” badge appears.
+
