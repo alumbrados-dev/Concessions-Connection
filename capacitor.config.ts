@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mrfoodtruck.app',
-  appName: 'Mr Food Truck',
+  appId: 'com.concessionsconnection.app',
+  appName: 'Concessions Connection',
   webDir: 'dist/public',
   server: {
     androidScheme: 'https'

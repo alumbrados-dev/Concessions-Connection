@@ -19,7 +19,7 @@ export default function Header({ onActivateVoice }: HeaderProps) {
           </div>
           <div>
             <h1 className="font-heading font-bold text-lg" data-testid="text-app-name">
-              Mr Food Truck
+              Concessions Connection
             </h1>
             <p className="text-xs text-muted-foreground" data-testid="text-location">
               Annandale, VA

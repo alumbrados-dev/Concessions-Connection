@@ -16,7 +16,7 @@ export async function generateHostessResponse(
   context: AIHostessContext = {}
 ): Promise<{ message: string; suggestedActions: string[] }> {
   try {
-    const systemPrompt = `You are a friendly AI hostess for Mr Food Truck (also known as Concessions Connection), a family-run mobile food truck. Your role is to:
+    const systemPrompt = `You are a friendly AI hostess for Concessions Connection (also known as Mr Food Truck), a family-run mobile food truck. Your role is to:
 1. Welcome customers warmly
 2. Help them navigate the menu
 3. Suggest complementary items and upsells (combos, drinks, sides)
@@ -59,7 +59,7 @@ Available actions: "add_combo", "view_specials", "checkout", "add_item", "view_c
   } catch (error) {
     console.error('AI Hostess error:', error);
     return {
-      message: "Hi! Welcome to TruckEats! How can I help you today?",
+      message: "Hi! Welcome to Concessions Connection! How can I help you today?",
       suggestedActions: ["view_specials"]
     };
   }

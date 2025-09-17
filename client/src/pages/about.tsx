@@ -67,7 +67,7 @@ export default function About() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-foreground leading-relaxed">
-              Mr Food Truck is a family-run mobile food truck founded by Amy and her loved ones. 
+              Concessions Connection is a family-run mobile food truck founded by Amy and her loved ones. 
               Fueled by a passion for fresh flavors and genuine hospitality, Amy steers every 
               aspect of the business—from crafting signature recipes to greeting you with a warm 
               smile at the window.

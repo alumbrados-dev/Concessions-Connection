@@ -20,7 +20,7 @@ export default function Login() {
     try {
       await login(email);
       toast({
-        title: "Welcome to Mr Food Truck!",
+        title: "Welcome to Concessions Connection!",
         description: "You've been successfully logged in.",
       });
     } catch (error) {
@@ -42,7 +42,7 @@ export default function Login() {
             <div className="w-24 h-24 bg-accent rounded-full mx-auto mb-4 flex items-center justify-center">
               <i className="fas fa-truck text-3xl text-accent-foreground"></i>
             </div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">Mr Food Truck</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Concessions Connection</h1>
             <p className="text-muted-foreground">...Linking families through tastes and experiences!</p>
           </div>
           

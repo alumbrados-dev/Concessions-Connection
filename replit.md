@@ -1,10 +1,10 @@
-# Mr Food Truck - Mobile Food Truck Application
+# Concessions Connection - Mobile Food Truck Application
 
 ## Overview
 
-Mr Food Truck is a full-stack mobile food truck application built with React and Express. The application connects customers with a food truck business, allowing users to browse menu items, place orders, and interact with an AI-powered voice assistant. The app is designed as a Progressive Web App (PWA) with Capacitor integration for mobile deployment, featuring real-time updates for inventory management and a comprehensive ordering system.
+Concessions Connection is a full-stack mobile food truck application built with React and Express. The application connects customers with a food truck business, allowing users to browse menu items, place orders, and interact with an AI-powered voice assistant. The app is designed as a Progressive Web App (PWA) with Capacitor integration for mobile deployment, featuring real-time updates for inventory management and a comprehensive ordering system.
 
-The application serves "Mr Food Truck" (also known as "Concessions Connection"), a family-run mobile food truck business, providing customers with an intuitive interface to explore menu items, view local events, and place orders while receiving personalized assistance through voice interaction.
+The application serves "Concessions Connection" (also known as "Mr Food Truck"), a family-run mobile food truck business, providing customers with an intuitive interface to explore menu items, view local events, and place orders while receiving personalized assistance through voice interaction.
 
 ## User Preferences
 

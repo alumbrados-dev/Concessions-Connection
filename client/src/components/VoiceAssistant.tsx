@@ -11,7 +11,7 @@ interface VoiceAssistantProps {
 }
 
 export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) {
-  const [message, setMessage] = useState("Hi! Welcome to Mr Food Truck! How can I help you today?");
+  const [message, setMessage] = useState("Hi! Welcome to Concessions Connection! How can I help you today?");
   const [suggestedActions, setSuggestedActions] = useState<string[]>(["view_specials"]);
   const { items: cartItems } = useCart();
 
