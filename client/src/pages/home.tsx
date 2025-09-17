@@ -57,10 +57,11 @@ export default function Home() {
 
   const categories = [
     { id: "all", name: "All Items" },
-    { id: "burgers", name: "Burgers" },
-    { id: "sides", name: "Fries" },
-    { id: "drinks", name: "Drinks" },
-    { id: "desserts", name: "Desserts" },
+    { id: "starters", name: "Starters" },
+    { id: "grill", name: "Off the Grill" },
+    { id: "drinks", name: "Refreshments" },
+    { id: "sides", name: "Fries & Sides" },
+    { id: "extras", name: "Extras" },
   ];
 
   const filteredItems = selectedCategory === "all" 

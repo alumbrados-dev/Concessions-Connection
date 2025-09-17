@@ -10,11 +10,13 @@ import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Home from "@/pages/home";
+import About from "@/pages/about";
 
 function AuthenticatedRoutes() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/about" component={About} />
       <Route component={NotFound} />
     </Switch>
   );

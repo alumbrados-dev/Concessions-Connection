@@ -16,7 +16,7 @@ export async function generateHostessResponse(
   context: AIHostessContext = {}
 ): Promise<{ message: string; suggestedActions: string[] }> {
   try {
-    const systemPrompt = `You are a friendly AI hostess for TruckEats, a mobile food truck. Your role is to:
+    const systemPrompt = `You are a friendly AI hostess for Mr Food Truck (also known as Concessions Connection), a family-run mobile food truck. Your role is to:
 1. Welcome customers warmly
 2. Help them navigate the menu
 3. Suggest complementary items and upsells (combos, drinks, sides)

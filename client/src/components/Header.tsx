@@ -19,10 +19,10 @@ export default function Header({ onActivateVoice }: HeaderProps) {
           </div>
           <div>
             <h1 className="font-heading font-bold text-lg" data-testid="text-app-name">
-              TruckEats
+              Mr Food Truck
             </h1>
             <p className="text-xs text-muted-foreground" data-testid="text-location">
-              Downtown Plaza
+              Annandale, VA
             </p>
           </div>
         </div>

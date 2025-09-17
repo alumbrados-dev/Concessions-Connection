@@ -1,6 +1,7 @@
 import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder } from "@shared/schema";
 import { db, users, items, localEvents, ads, orders } from "./lib/db";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 export interface IStorage {
   // User operations
@@ -29,16 +30,41 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private initialized = false;
+  private fallbackMode = false;
+  private fallbackData = {
+    users: new Map<string, User>(),
+    items: new Map<string, Item>(),
+    events: new Map<string, LocalEvent>(),
+    ads: new Map<string, Ad>(),
+    orders: new Map<string, Order>(),
+  };
+
   constructor() {
-    // Initialize with sample data on first run
-    this.initializeData();
+    // Initialize data asynchronously to avoid blocking the constructor
+    this.initializeData().catch(console.error);
+  }
+
+  private async ensureInitialized() {
+    if (!this.initialized) {
+      await this.initializeData();
+    }
   }
 
   private async initializeData() {
-    // Check if data already exists
-    const existingItems = await db.select().from(items).limit(1);
-    if (existingItems.length > 0) {
-      return; // Data already initialized
+    try {
+      // Check if data already exists
+      const existingItems = await db.select().from(items).limit(1);
+      if (existingItems.length > 0) {
+        return; // Data already initialized
+      }
+    } catch (error) {
+      console.error('Database connection error during initialization:', error);
+      console.log('App will continue with fallback data');
+      this.fallbackMode = true;
+      this.initializeFallbackData();
+      this.initialized = true;
+      return;
     }
 
     // Concessions Connection Menu Items
@@ -218,54 +244,171 @@ export class DatabaseStorage implements IStorage {
     ];
 
     // Insert menu items
-    await db.insert(items).values(menuItems);
+    try {
+      // Insert menu items
+      await db.insert(items).values(menuItems);
 
-    // Sample events
-    const sampleEvents: InsertLocalEvent[] = [
+      // Sample events
+      const sampleEvents: InsertLocalEvent[] = [
+        {
+          eventName: "Mason District Community Festival",
+          dateTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+          location: "Near Mason District Park, Annandale, VA",
+          description: "Join us at the community festival for delicious food and family fun!",
+          active: true,
+        },
+      ];
+
+      await db.insert(localEvents).values(sampleEvents);
+
+      // Sample ads
+      const sampleAds: InsertAd[] = [
+        {
+          bizName: "Mason District Park",
+          description: "Beautiful park with walking trails and playgrounds - 0.2 miles away",
+          location: "Annandale, VA",
+          link: "https://www.fairfaxcounty.gov/parks/mason-district",
+          active: true,
+        },
+      ];
+
+      await db.insert(ads).values(sampleAds);
+      console.log('Database initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize database, using fallback mode:', error);
+      this.fallbackMode = true;
+      this.initializeFallbackData();
+    }
+    this.initialized = true;
+  }
+
+  private initializeFallbackData() {
+    // Initialize with sample menu data for fallback mode
+    const fallbackItems: Item[] = [
       {
-        eventName: "Mason District Community Festival",
-        dateTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-        location: "Near Mason District Park, Annandale, VA",
-        description: "Join us at the community festival for delicious food and family fun!",
-        active: true,
+        id: "item-1",
+        name: "Jumbo Pretzel",
+        description: "Warm, salted/unsalted pretzels served w/your choice of dippings: Nacho cheese or mustard",
+        price: "4.00",
+        stock: 20,
+        category: "starters",
+        imageUrl: null,
+        available: true,
+        updatedAt: new Date(),
+      },
+      {
+        id: "item-2", 
+        name: "Cheese Steak Sandwich",
+        description: "Griddled rib-eye chip steak, provolone cheese, sautéed onions & peppers, served on a hoagie roll",
+        price: "9.00",
+        stock: 12,
+        category: "grill", 
+        imageUrl: null,
+        available: true,
+        updatedAt: new Date(),
+      },
+      {
+        id: "item-3",
+        name: "Fresh Lemonade (32 oz.)",
+        description: "Fresh-squeezed lemonade, w/choice of added purees: Strawberry, Raspberry & Blueberry",
+        price: "8.00", 
+        stock: 20,
+        category: "drinks",
+        imageUrl: null,
+        available: true,
+        updatedAt: new Date(),
       },
     ];
 
-    await db.insert(localEvents).values(sampleEvents);
+    fallbackItems.forEach(item => this.fallbackData.items.set(item.id, item));
 
-    // Sample ads
-    const sampleAds: InsertAd[] = [
-      {
-        bizName: "Mason District Park",
-        description: "Beautiful park with walking trails and playgrounds - 0.2 miles away",
-        location: "Annandale, VA",
-        link: "https://www.fairfaxcounty.gov/parks/mason-district",
-        active: true,
-      },
-    ];
+    const fallbackEvent: LocalEvent = {
+      id: "event-1",
+      eventName: "Mason District Community Festival", 
+      dateTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      location: "Near Mason District Park, Annandale, VA",
+      description: "Join us at the community festival for delicious food and family fun!",
+      imageUrl: null,
+      active: true,
+    };
 
-    await db.insert(ads).values(sampleAds);
+    this.fallbackData.events.set(fallbackEvent.id, fallbackEvent);
   }
 
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0] || undefined;
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.users.get(id);
+    }
+    
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return this.fallbackData.users.get(id);
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    return result[0] || undefined;
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.users.values()).find(user => user.email === email);
+    }
+    
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return Array.from(this.fallbackData.users.values()).find(user => user.email === email);
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(insertUser).returning();
-    return result[0];
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const id = randomUUID();
+      const user: User = {
+        ...insertUser,
+        id,
+        createdAt: new Date(),
+      };
+      this.fallbackData.users.set(id, user);
+      return user;
+    }
+    
+    try {
+      const result = await db.insert(users).values(insertUser).returning();
+      return result[0];
+    } catch (error) {
+      // Fallback to in-memory storage
+      const id = randomUUID();
+      const user: User = {
+        ...insertUser,
+        id,
+        createdAt: new Date(),
+      };
+      this.fallbackData.users.set(id, user);
+      return user;
+    }
   }
 
   // Item operations
   async getAllItems(): Promise<Item[]> {
-    return await db.select().from(items);
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.items.values());
+    }
+    
+    try {
+      return await db.select().from(items);
+    } catch (error) {
+      return Array.from(this.fallbackData.items.values());
+    }
   }
 
   async getItem(id: string): Promise<Item | undefined> {
