@@ -880,10 +880,768 @@ function MenuManagementTab() {
 }
 
 function EventsAdsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeSection, setActiveSection] = useState<'events' | 'ads'>('events');
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [isCreateAdModalOpen, setIsCreateAdModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [editingAd, setEditingAd] = useState<any>(null);
+  const [eventForm, setEventForm] = useState({
+    name: "",
+    description: "",
+    date: "",
+    location: "",
+    url: ""
+  });
+  const [adForm, setAdForm] = useState({
+    title: "",
+    content: "",
+    imageUrl: "",
+    url: "",
+    type: ""
+  });
+
+  // Fetch events
+  const { data: events = [], isLoading: eventsLoading, error: eventsError } = useQuery({
+    queryKey: ['/api/admin/events'],
+    queryFn: () => apiRequest('/api/admin/events')
+  }) as { data: any[], isLoading: boolean, error: any };
+
+  // Fetch ads
+  const { data: ads = [], isLoading: adsLoading, error: adsError } = useQuery({
+    queryKey: ['/api/admin/ads'],
+    queryFn: () => apiRequest('/api/admin/ads')
+  }) as { data: any[], isLoading: boolean, error: any };
+
+  // Event mutations
+  const createEventMutation = useMutation({
+    mutationFn: (eventData: any) => apiRequest('/api/admin/events', {
+      method: 'POST',
+      body: JSON.stringify(eventData)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast({
+        title: "Event Created",
+        description: "Event has been created successfully.",
+      });
+      resetEventForm();
+      setIsCreateEventModalOpen(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create event. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => 
+      apiRequest(`/api/admin/events/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast({
+        title: "Event Updated",
+        description: "Event has been updated successfully.",
+      });
+      resetEventForm();
+      setEditingEvent(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update event. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/admin/events/${id}`, {
+      method: 'DELETE'
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast({
+        title: "Event Deleted",
+        description: "Event has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete event. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Ad mutations
+  const createAdMutation = useMutation({
+    mutationFn: (adData: any) => apiRequest('/api/admin/ads', {
+      method: 'POST',
+      body: JSON.stringify(adData)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/ads'] });
+      toast({
+        title: "Ad Created",
+        description: "Advertisement has been created successfully.",
+      });
+      resetAdForm();
+      setIsCreateAdModalOpen(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create ad. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateAdMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => 
+      apiRequest(`/api/admin/ads/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/ads'] });
+      toast({
+        title: "Ad Updated",
+        description: "Advertisement has been updated successfully.",
+      });
+      resetAdForm();
+      setEditingAd(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update ad. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteAdMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/admin/ads/${id}`, {
+      method: 'DELETE'
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/ads'] });
+      toast({
+        title: "Ad Deleted",
+        description: "Advertisement has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete ad. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const resetEventForm = () => {
+    setEventForm({
+      name: "",
+      description: "",
+      date: "",
+      location: "",
+      url: ""
+    });
+  };
+
+  const resetAdForm = () => {
+    setAdForm({
+      title: "",
+      content: "",
+      imageUrl: "",
+      url: "",
+      type: ""
+    });
+  };
+
+  const handleCreateEvent = () => {
+    if (!eventForm.name || !eventForm.date) {
+      toast({
+        title: "Error",
+        description: "Please provide event name and date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const eventData = {
+      name: eventForm.name,
+      description: eventForm.description || null,
+      date: eventForm.date,
+      location: eventForm.location || null,
+      url: eventForm.url || null
+    };
+
+    createEventMutation.mutate(eventData);
+  };
+
+  const handleUpdateEvent = () => {
+    if (!editingEvent || !eventForm.name || !eventForm.date) {
+      toast({
+        title: "Error",
+        description: "Please provide event name and date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const eventData = {
+      name: eventForm.name,
+      description: eventForm.description || null,
+      date: eventForm.date,
+      location: eventForm.location || null,
+      url: eventForm.url || null
+    };
+
+    updateEventMutation.mutate({ id: editingEvent.id, data: eventData });
+  };
+
+  const handleCreateAd = () => {
+    if (!adForm.title || !adForm.content) {
+      toast({
+        title: "Error",
+        description: "Please provide ad title and content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const adData = {
+      title: adForm.title,
+      content: adForm.content,
+      imageUrl: adForm.imageUrl || null,
+      url: adForm.url || null,
+      type: adForm.type || null
+    };
+
+    createAdMutation.mutate(adData);
+  };
+
+  const handleUpdateAd = () => {
+    if (!editingAd || !adForm.title || !adForm.content) {
+      toast({
+        title: "Error",
+        description: "Please provide ad title and content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const adData = {
+      title: adForm.title,
+      content: adForm.content,
+      imageUrl: adForm.imageUrl || null,
+      url: adForm.url || null,
+      type: adForm.type || null
+    };
+
+    updateAdMutation.mutate({ id: editingAd.id, data: adData });
+  };
+
+  const handleEditEvent = (event: any) => {
+    setEditingEvent(event);
+    setEventForm({
+      name: event.name,
+      description: event.description || "",
+      date: event.date,
+      location: event.location || "",
+      url: event.url || ""
+    });
+  };
+
+  const handleEditAd = (ad: any) => {
+    setEditingAd(ad);
+    setAdForm({
+      title: ad.title,
+      content: ad.content,
+      imageUrl: ad.imageUrl || "",
+      url: ad.url || "",
+      type: ad.type || ""
+    });
+  };
+
+  const handleDeleteEvent = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      deleteEventMutation.mutate(id);
+    }
+  };
+
+  const handleDeleteAd = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this ad?')) {
+      deleteAdMutation.mutate(id);
+    }
+  };
+
+  const isLoading = activeSection === 'events' ? eventsLoading : adsLoading;
+  const hasError = activeSection === 'events' ? eventsError : adsError;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading {activeSection}...</span>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <span className="text-destructive font-medium">Failed to load {activeSection}</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please check your connection and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Events & Advertisements</h2>
-      <p className="text-muted-foreground">Local events and promotional ads management will be implemented here.</p>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Events & Ads Management</h2>
+          <p className="text-muted-foreground">Manage local events and promotional advertisements</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={activeSection === 'events' ? 'default' : 'outline'}
+            onClick={() => setActiveSection('events')}
+            data-testid="button-switch-events"
+          >
+            <CalendarDays className="w-4 h-4 mr-2" />
+            Events
+          </Button>
+          <Button
+            variant={activeSection === 'ads' ? 'default' : 'outline'}
+            onClick={() => setActiveSection('ads')}
+            data-testid="button-switch-ads"
+          >
+            <Megaphone className="w-4 h-4 mr-2" />
+            Ads
+          </Button>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Events Section */}
+      {activeSection === 'events' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Local Events</h3>
+              <p className="text-sm text-muted-foreground">Upcoming local events and community activities</p>
+            </div>
+            <Button
+              onClick={() => setIsCreateEventModalOpen(true)}
+              data-testid="button-create-event"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Event
+            </Button>
+          </div>
+
+          {/* Events Statistics */}
+          <div className="grid grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{(events || []).length}</div>
+                <p className="text-xs text-muted-foreground">Total Events</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">
+                  {(events || []).filter((event: any) => new Date(event.date) >= new Date()).length}
+                </div>
+                <p className="text-xs text-muted-foreground">Upcoming</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">
+                  {(events || []).filter((event: any) => new Date(event.date) < new Date()).length}
+                </div>
+                <p className="text-xs text-muted-foreground">Past Events</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Events List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Events</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(events || []).length === 0 ? (
+                <div className="text-center py-8">
+                  <CalendarDays className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No events found. Add your first event to get started.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(events || []).map((event: any) => (
+                    <div key={event.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex-1">
+                            <h3 className="font-semibold">{event.name}</h3>
+                            {event.description && (
+                              <p className="text-sm text-muted-foreground">{event.description}</p>
+                            )}
+                            <div className="flex items-center space-x-4 mt-2">
+                              <span className="text-sm font-medium">
+                                {new Date(event.date).toLocaleDateString()}
+                              </span>
+                              {event.location && (
+                                <span className="text-xs bg-secondary px-2 py-1 rounded">{event.location}</span>
+                              )}
+                              <span className={`text-xs px-2 py-1 rounded ${new Date(event.date) >= new Date() ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {new Date(event.date) >= new Date() ? 'Upcoming' : 'Past'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditEvent(event)}
+                          data-testid={`button-edit-event-${event.id}`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          disabled={deleteEventMutation.isPending}
+                          data-testid={`button-delete-event-${event.id}`}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Ads Section */}
+      {activeSection === 'ads' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Promotional Ads</h3>
+              <p className="text-sm text-muted-foreground">Promotional advertisements and marketing content</p>
+            </div>
+            <Button
+              onClick={() => setIsCreateAdModalOpen(true)}
+              data-testid="button-create-ad"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Advertisement
+            </Button>
+          </div>
+
+          {/* Ads Statistics */}
+          <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{(ads || []).length}</div>
+                <p className="text-xs text-muted-foreground">Total Ads</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">
+                  {(ads || []).filter((ad: any) => ad.imageUrl).length}
+                </div>
+                <p className="text-xs text-muted-foreground">With Images</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Ads List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Advertisements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(ads || []).length === 0 ? (
+                <div className="text-center py-8">
+                  <Megaphone className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No ads found. Add your first advertisement to get started.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(ads || []).map((ad: any) => (
+                    <div key={ad.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex-1">
+                            <h3 className="font-semibold">{ad.title}</h3>
+                            <p className="text-sm text-muted-foreground">{ad.content}</p>
+                            <div className="flex items-center space-x-4 mt-2">
+                              {ad.type && (
+                                <span className="text-xs bg-secondary px-2 py-1 rounded">{ad.type}</span>
+                              )}
+                              {ad.imageUrl && (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Has Image</span>
+                              )}
+                              {ad.url && (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Has Link</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditAd(ad)}
+                          data-testid={`button-edit-ad-${ad.id}`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteAd(ad.id)}
+                          disabled={deleteAdMutation.isPending}
+                          data-testid={`button-delete-ad-${ad.id}`}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Create/Edit Event Modal */}
+      {(isCreateEventModalOpen || editingEvent) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle>{editingEvent ? 'Edit Event' : 'Create Event'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="event-name">Event Name *</Label>
+                <Input
+                  id="event-name"
+                  value={eventForm.name}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Event name"
+                  data-testid="input-event-name"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="event-description">Description</Label>
+                <Input
+                  id="event-description"
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Event description"
+                  data-testid="input-event-description"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="event-date">Date *</Label>
+                <Input
+                  id="event-date"
+                  type="date"
+                  value={eventForm.date}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, date: e.target.value }))}
+                  data-testid="input-event-date"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="event-location">Location</Label>
+                <Input
+                  id="event-location"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder="Event location"
+                  data-testid="input-event-location"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="event-url">Event URL</Label>
+                <Input
+                  id="event-url"
+                  value={eventForm.url}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, url: e.target.value }))}
+                  placeholder="https://example.com/event"
+                  data-testid="input-event-url"
+                />
+              </div>
+            </CardContent>
+            <div className="flex justify-end space-x-2 p-6 pt-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetEventForm();
+                  setIsCreateEventModalOpen(false);
+                  setEditingEvent(null);
+                }}
+                data-testid="button-cancel-event"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={editingEvent ? handleUpdateEvent : handleCreateEvent}
+                disabled={createEventMutation.isPending || updateEventMutation.isPending}
+                data-testid="button-save-event"
+              >
+                {(createEventMutation.isPending || updateEventMutation.isPending) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {editingEvent ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingEvent ? 'Update Event' : 'Create Event'
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Create/Edit Ad Modal */}
+      {(isCreateAdModalOpen || editingAd) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle>{editingAd ? 'Edit Advertisement' : 'Create Advertisement'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="ad-title">Title *</Label>
+                <Input
+                  id="ad-title"
+                  value={adForm.title}
+                  onChange={(e) => setAdForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Ad title"
+                  data-testid="input-ad-title"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="ad-content">Content *</Label>
+                <Input
+                  id="ad-content"
+                  value={adForm.content}
+                  onChange={(e) => setAdForm(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Ad content"
+                  data-testid="input-ad-content"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="ad-type">Type</Label>
+                <Input
+                  id="ad-type"
+                  value={adForm.type}
+                  onChange={(e) => setAdForm(prev => ({ ...prev, type: e.target.value }))}
+                  placeholder="e.g., Special Offer, Announcement"
+                  data-testid="input-ad-type"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="ad-image">Image URL</Label>
+                <Input
+                  id="ad-image"
+                  value={adForm.imageUrl}
+                  onChange={(e) => setAdForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  placeholder="https://example.com/image.jpg"
+                  data-testid="input-ad-image"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="ad-url">Link URL</Label>
+                <Input
+                  id="ad-url"
+                  value={adForm.url}
+                  onChange={(e) => setAdForm(prev => ({ ...prev, url: e.target.value }))}
+                  placeholder="https://example.com/offer"
+                  data-testid="input-ad-url"
+                />
+              </div>
+            </CardContent>
+            <div className="flex justify-end space-x-2 p-6 pt-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetAdForm();
+                  setIsCreateAdModalOpen(false);
+                  setEditingAd(null);
+                }}
+                data-testid="button-cancel-ad"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={editingAd ? handleUpdateAd : handleCreateAd}
+                disabled={createAdMutation.isPending || updateAdMutation.isPending}
+                data-testid="button-save-ad"
+              >
+                {(createAdMutation.isPending || updateAdMutation.isPending) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {editingAd ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingAd ? 'Update Ad' : 'Create Ad'
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
