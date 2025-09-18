@@ -9,6 +9,7 @@ import LocationBanner from "@/components/LocationBanner";
 import MenuItems from "@/components/MenuItems";
 import LocalEvents from "@/components/LocalEvents";
 import VoiceAssistant from "@/components/VoiceAssistant";
+import FloatingAIButton from "@/components/FloatingAIButton";
 
 // Import hero images
 import concessionsImage from "@assets/1Concessions_1758151930547.png";
@@ -220,6 +221,9 @@ export default function Home() {
           onClose={() => setShowVoiceAssistant(false)}
         />
       )}
+      
+      {/* Floating AI Button */}
+      <FloatingAIButton onActivate={() => setShowVoiceAssistant(true)} />
     </div>
   );
 }
