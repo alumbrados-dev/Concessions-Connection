@@ -86,6 +86,16 @@ export const emailVerifications = pgTable("email_verifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  pushEnabled: boolean("push_enabled").default(false),
+  pushToken: text("push_token"), // Device push token from Capacitor
+  permissionStatus: text("permission_status").default("default"), // "default", "granted", "denied"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -125,6 +135,12 @@ export const insertEmailVerificationSchema = createInsertSchema(emailVerificatio
   createdAt: true,
 });
 
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -149,3 +165,6 @@ export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 
 export type EmailVerification = typeof emailVerifications.$inferSelect;
 export type InsertEmailVerification = z.infer<typeof insertEmailVerificationSchema>;
+
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;

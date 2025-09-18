@@ -1,5 +1,5 @@
-import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings, type EmailVerification, type InsertEmailVerification } from "@shared/schema";
-import { db, users, items, localEvents, ads, orders, truckLocation, settings, emailVerifications } from "./lib/db";
+import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings, type EmailVerification, type InsertEmailVerification, type NotificationPreferences, type InsertNotificationPreferences } from "@shared/schema";
+import { db, users, items, localEvents, ads, orders, truckLocation, settings, emailVerifications, notificationPreferences } from "./lib/db";
 import { eq, and, sql, like, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -61,6 +61,14 @@ export interface IStorage {
   incrementVerificationAttempts(email: string, code: string): Promise<boolean>;
   incrementVerificationAttemptsByEmail(email: string): Promise<boolean>;
   cleanupExpiredVerifications(): Promise<void>;
+
+  // Notification preference operations
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
+  createNotificationPreferences(preferences: InsertNotificationPreferences): Promise<NotificationPreferences>;
+  updateNotificationPreferences(userId: string, updates: Partial<NotificationPreferences>): Promise<NotificationPreferences | undefined>;
+  updatePushToken(userId: string, pushToken: string): Promise<NotificationPreferences | undefined>;
+  togglePushNotifications(userId: string, enabled: boolean): Promise<NotificationPreferences | undefined>;
+  getUsersWithPushEnabled(): Promise<NotificationPreferences[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -75,6 +83,7 @@ export class DatabaseStorage implements IStorage {
     truckLocation: null as TruckLocation | null,
     settings: new Map<string, Settings>(),
     emailVerifications: new Map<string, EmailVerification>(),
+    notificationPreferences: new Map<string, NotificationPreferences>(),
   };
 
   constructor() {
@@ -1582,6 +1591,103 @@ export class DatabaseStorage implements IStorage {
         .map(([id, _]) => id);
       
       toDelete.forEach(id => this.fallbackData.emailVerifications.delete(id));
+    }
+  }
+
+  // Notification preference operations
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.notificationPreferences.values()).find(pref => pref.userId === userId);
+    }
+    
+    try {
+      const [preference] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+      return preference;
+    } catch (error) {
+      console.error('Error getting notification preferences:', error);
+      return undefined;
+    }
+  }
+
+  async createNotificationPreferences(preferences: InsertNotificationPreferences): Promise<NotificationPreferences> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const newPreferences: NotificationPreferences = {
+        id: randomUUID(),
+        ...preferences,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.fallbackData.notificationPreferences.set(newPreferences.id, newPreferences);
+      return newPreferences;
+    }
+    
+    try {
+      const [created] = await db.insert(notificationPreferences).values(preferences).returning();
+      return created;
+    } catch (error) {
+      console.error('Error creating notification preferences:', error);
+      throw new Error('Failed to create notification preferences');
+    }
+  }
+
+  async updateNotificationPreferences(userId: string, updates: Partial<NotificationPreferences>): Promise<NotificationPreferences | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const existing = Array.from(this.fallbackData.notificationPreferences.values()).find(pref => pref.userId === userId);
+      if (!existing) return undefined;
+      
+      const updated = { ...existing, ...updates, updatedAt: new Date() };
+      this.fallbackData.notificationPreferences.set(existing.id, updated);
+      return updated;
+    }
+    
+    try {
+      const [updated] = await db.update(notificationPreferences)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(notificationPreferences.userId, userId))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      return undefined;
+    }
+  }
+
+  async updatePushToken(userId: string, pushToken: string): Promise<NotificationPreferences | undefined> {
+    await this.ensureInitialized();
+    
+    return this.updateNotificationPreferences(userId, { pushToken });
+  }
+
+  async togglePushNotifications(userId: string, enabled: boolean): Promise<NotificationPreferences | undefined> {
+    await this.ensureInitialized();
+    
+    return this.updateNotificationPreferences(userId, { pushEnabled: enabled });
+  }
+
+  async getUsersWithPushEnabled(): Promise<NotificationPreferences[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.notificationPreferences.values())
+        .filter(pref => pref.pushEnabled && pref.pushToken);
+    }
+    
+    try {
+      const enabledUsers = await db.select().from(notificationPreferences)
+        .where(and(
+          eq(notificationPreferences.pushEnabled, true),
+          sql`${notificationPreferences.pushToken} IS NOT NULL`
+        ));
+      return enabledUsers;
+    } catch (error) {
+      console.error('Error getting users with push enabled:', error);
+      return [];
     }
   }
 }

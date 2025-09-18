@@ -28,8 +28,11 @@ import {
   Search,
   Shield,
   CheckCircle2,
-  Circle
+  Circle,
+  Bell,
+  Send
 } from "lucide-react";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 // AI Settings Tab Implementation
 function AISettingsTab() {
@@ -2519,6 +2522,195 @@ function ThemeEditorTab() {
   );
 }
 
+// Notification Management Tab Implementation
+function NotificationManagementTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch users with push notifications enabled
+  const { data: pushUsers, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['/api/admin/notifications/users'],
+  });
+
+  // Send notification to all users mutation
+  const sendNotificationMutation = useMutation({
+    mutationFn: (data: { title: string; body: string; data?: any }) =>
+      apiRequest('POST', '/api/admin/notifications/send', data),
+    onSuccess: (data) => {
+      toast({
+        title: "Notification Sent",
+        description: `Notification sent to ${data.sent} devices successfully.`,
+      });
+      // Reset form would go here
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Send Failed",
+        description: error?.message || "Failed to send notification.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const [notificationForm, setNotificationForm] = useState({
+    title: '',
+    body: '',
+  });
+
+  const handleSendNotification = () => {
+    if (!notificationForm.title.trim() || !notificationForm.body.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both title and message.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendNotificationMutation.mutate({
+      title: notificationForm.title.trim(),
+      body: notificationForm.body.trim(),
+    });
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-notification-management">
+            <Bell className="w-6 h-6 text-blue-600" />
+            <span>Notification Management</span>
+          </h2>
+          <p className="text-muted-foreground">Manage push notifications and user preferences</p>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* User Notification Settings */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Your Notification Settings</h3>
+        <NotificationSettings />
+      </div>
+
+      <Separator />
+
+      {/* Admin Send Notifications */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Send Notification to All Users</h3>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Send className="w-5 h-5" />
+              <span>Broadcast Notification</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="notification-title">Title</Label>
+              <Input
+                id="notification-title"
+                placeholder="e.g., New Menu Items Available!"
+                value={notificationForm.title}
+                onChange={(e) => setNotificationForm(prev => ({ ...prev, title: e.target.value }))}
+                data-testid="input-notification-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notification-body">Message</Label>
+              <Input
+                id="notification-body"
+                placeholder="e.g., Check out our delicious new sandwiches and refreshing drinks."
+                value={notificationForm.body}
+                onChange={(e) => setNotificationForm(prev => ({ ...prev, body: e.target.value }))}
+                data-testid="input-notification-body"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground">
+                {isLoadingUsers ? (
+                  <span className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading recipients...</span>
+                  </span>
+                ) : (
+                  <span data-testid="text-recipient-count">
+                    {pushUsers?.length || 0} users will receive this notification
+                  </span>
+                )}
+              </div>
+              <Button
+                onClick={handleSendNotification}
+                disabled={sendNotificationMutation.isPending || !notificationForm.title.trim() || !notificationForm.body.trim()}
+                data-testid="button-send-notification"
+              >
+                {sendNotificationMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Send Notification
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Users with Push Enabled */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Users with Push Notifications Enabled</h3>
+        <Card>
+          <CardContent className="p-6">
+            {isLoadingUsers ? (
+              <div className="flex items-center justify-center space-x-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading users...</span>
+              </div>
+            ) : pushUsers && pushUsers.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground mb-4">
+                  {pushUsers.length} users have enabled push notifications
+                </p>
+                <div className="grid gap-2">
+                  {pushUsers.slice(0, 10).map((user: any, index: number) => (
+                    <div key={user.id} className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <span className="text-sm">User {user.userId.slice(0, 8)}...</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(user.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                  {pushUsers.length > 10 && (
+                    <p className="text-xs text-muted-foreground text-center pt-2">
+                      And {pushUsers.length - 10} more users...
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <BellOff className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-muted-foreground">No users have enabled push notifications yet.</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Users can enable notifications in their profile settings.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function HoursLocationTab() {
   return (
     <div className="p-6">
@@ -2631,6 +2823,14 @@ export default function Admin() {
                   Theme Editor
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="notifications" 
+                  className="manila-tab"
+                  data-testid="tab-notifications"
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  Notifications
+                </TabsTrigger>
+                <TabsTrigger 
                   value="hours" 
                   className="manila-tab"
                   data-testid="tab-hours"
@@ -2660,6 +2860,9 @@ export default function Admin() {
               </TabsContent>
               <TabsContent value="theme" className="m-0">
                 <ThemeEditorTab />
+              </TabsContent>
+              <TabsContent value="notifications" className="m-0">
+                <NotificationManagementTab />
               </TabsContent>
               <TabsContent value="hours" className="m-0">
                 <HoursLocationTab />

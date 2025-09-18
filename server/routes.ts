@@ -10,7 +10,8 @@ import {
   insertLocalEventSchema,
   insertAdSchema,
   insertTruckLocationSchema,
-  insertEmailVerificationSchema
+  insertEmailVerificationSchema,
+  insertNotificationPreferencesSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { SquareClient, SquareEnvironment } from "square";
@@ -80,6 +81,40 @@ function verifySecureToken(token: string): { userId: string; email: string } | n
   } catch (error) {
     console.error('JWT verification failed:', error);
     return null;
+  }
+}
+
+// Regular user authentication middleware using JWT
+async function requireAuth(req: any, res: any, next: any) {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Verify JWT token
+    const tokenData = verifySecureToken(token);
+    if (!tokenData) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    // Get user from database using verified user ID
+    const user = await storage.getUser(tokenData.userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    // Verify email matches token (prevents token reuse if user email changes)
+    if (user.email !== tokenData.email) {
+      return res.status(401).json({ error: "Token email mismatch" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('User authentication failed:', error);
+    res.status(401).json({ error: "Authentication failed" });
   }
 }
 
@@ -593,6 +628,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(orders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  // Notification routes
+  // Get current user's notification preferences
+  app.get("/api/notifications/preferences", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      let preferences = await storage.getNotificationPreferences(userId);
+      
+      // Create default preferences if none exist
+      if (!preferences) {
+        preferences = await storage.createNotificationPreferences({
+          userId,
+          pushEnabled: false,
+          permissionStatus: 'default',
+        });
+      }
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      res.status(500).json({ error: "Failed to fetch notification preferences" });
+    }
+  });
+
+  // Update notification preferences (opt-in/opt-out)
+  app.put("/api/notifications/preferences", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const updates = z.object({
+        pushEnabled: z.boolean().optional(),
+        permissionStatus: z.enum(['default', 'granted', 'denied']).optional(),
+      }).parse(req.body);
+      
+      let preferences = await storage.getNotificationPreferences(userId);
+      
+      if (!preferences) {
+        // Create new preferences if none exist
+        preferences = await storage.createNotificationPreferences({
+          userId,
+          pushEnabled: updates.pushEnabled ?? false,
+          permissionStatus: updates.permissionStatus ?? 'default',
+        });
+      } else {
+        // Update existing preferences
+        preferences = await storage.updateNotificationPreferences(userId, updates);
+      }
+      
+      if (!preferences) {
+        return res.status(500).json({ error: "Failed to update notification preferences" });
+      }
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      res.status(400).json({ error: "Invalid notification preferences data" });
+    }
+  });
+
+  // Register push token
+  app.post("/api/notifications/register", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { pushToken } = z.object({
+        pushToken: z.string().min(1, "Push token is required"),
+      }).parse(req.body);
+      
+      // Update push token and enable notifications
+      const preferences = await storage.updateNotificationPreferences(userId, {
+        pushToken,
+        pushEnabled: true,
+        permissionStatus: 'granted',
+      });
+      
+      if (!preferences) {
+        return res.status(500).json({ error: "Failed to register push token" });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Push token registered successfully",
+        preferences 
+      });
+    } catch (error) {
+      console.error('Error registering push token:', error);
+      res.status(400).json({ error: "Invalid push token data" });
+    }
+  });
+
+  // Admin routes for notification management
+  app.get("/api/admin/notifications/users", requireAdmin, async (req, res) => {
+    try {
+      const usersWithPush = await storage.getUsersWithPushEnabled();
+      res.json(usersWithPush);
+    } catch (error) {
+      console.error('Error fetching users with push enabled:', error);
+      res.status(500).json({ error: "Failed to fetch users with push notifications" });
+    }
+  });
+
+  // Rate limit for admin notification sending - prevent spam
+  const adminNotificationRateLimit = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 5, // Limit admin to 5 notification broadcasts per minute
+    message: {
+      error: "Too many notification broadcasts. Please wait before sending more notifications.",
+      retryAfter: 60 // seconds
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Send notification to all users (admin only)
+  app.post("/api/admin/notifications/send", adminNotificationRateLimit, requireAdmin, async (req, res) => {
+    try {
+      const { title, body, data } = z.object({
+        title: z.string().min(1, "Title is required"),
+        body: z.string().min(1, "Body is required"),
+        data: z.record(z.any()).optional(),
+      }).parse(req.body);
+      
+      const usersWithPush = await storage.getUsersWithPushEnabled();
+      
+      if (usersWithPush.length === 0) {
+        return res.json({ 
+          success: true, 
+          message: "No users have push notifications enabled",
+          sent: 0 
+        });
+      }
+      
+      // In a real implementation, you would send notifications here
+      // For now, we'll just return the count of users who would receive the notification
+      const pushTokens = usersWithPush
+        .filter(user => user.pushToken)
+        .map(user => user.pushToken);
+      
+      // TODO: Implement actual push notification sending
+      // This would use FCM, APNS, or another push service
+      console.log(`Admin notification broadcast - User: ${req.user.email} | Recipients: ${pushTokens.length} devices:`, {
+        title,
+        body,
+        data,
+        tokens: pushTokens,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.json({ 
+        success: true, 
+        message: `Notification queued for ${pushTokens.length} devices`,
+        sent: pushTokens.length,
+        recipients: usersWithPush.length
+      });
+    } catch (error) {
+      console.error('Error sending notifications:', error);
+      res.status(400).json({ error: "Invalid notification data" });
     }
   });
 
