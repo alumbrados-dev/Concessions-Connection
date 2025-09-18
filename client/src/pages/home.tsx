@@ -10,6 +10,9 @@ import MenuItems from "@/components/MenuItems";
 import LocalEvents from "@/components/LocalEvents";
 import VoiceAssistant from "@/components/VoiceAssistant";
 import FloatingAIButton from "@/components/FloatingAIButton";
+import ShareModal from "@/components/ShareModal";
+import QRCodeModal from "@/components/QRCodeModal";
+import AppInfoModal from "@/components/AppInfoModal";
 
 // Import hero images
 import concessionsImage from "@assets/1Concessions_1758151930547.png";
@@ -23,6 +26,9 @@ import linkingImageSmall from "@assets/1Linking_small_1758151930553.png";
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showVoiceAssistant, setShowVoiceAssistant] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [showAppModal, setShowAppModal] = useState(false);
   const { toast } = useToast();
   const { isMobile, screenWidth } = useDevice();
 
@@ -95,9 +101,21 @@ export default function Home() {
     return linkingImage;
   };
 
+  const handleScrollToAbout = () => {
+    const aboutSection = document.querySelector('[data-testid="text-about-title"]');
+    if (aboutSection) {
+      aboutSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header 
+        onShowAbout={handleScrollToAbout}
+        onShare={() => setShowShareModal(true)}
+        onShowQR={() => setShowQRModal(true)}
+        onShowApp={() => setShowAppModal(true)}
+      />
       
       {currentEvent && (
         <LocationBanner 
@@ -224,6 +242,20 @@ export default function Home() {
       
       {/* Floating AI Button */}
       <FloatingAIButton onActivate={() => setShowVoiceAssistant(true)} />
+      
+      {/* Modal Components */}
+      <ShareModal 
+        isOpen={showShareModal} 
+        onClose={() => setShowShareModal(false)} 
+      />
+      <QRCodeModal 
+        isOpen={showQRModal} 
+        onClose={() => setShowQRModal(false)} 
+      />
+      <AppInfoModal 
+        isOpen={showAppModal} 
+        onClose={() => setShowAppModal(false)} 
+      />
     </div>
   );
 }
