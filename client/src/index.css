@@ -108,6 +108,15 @@
   50% { transform: none; animation-timing-function: cubic-bezier(0,0,0.2,1); }
 }
 
+/* Hero Banner Enhancement Styles */
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-stops));
+}
+
+.hover\:scale-102:hover {
+  transform: scale(1.02);
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

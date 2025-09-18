@@ -129,37 +129,50 @@ export default function Home() {
         />
       )}
 
-      {/* Hero Section */}
-      <section className="relative w-full">
+      {/* Hero Section - Enhanced and Centered */}
+      <section className="relative w-full bg-gradient-to-b from-background via-background/95 to-muted/20 py-8">
         {/* Connect 4 box - positioned absolutely on top left */}
-        <div className="absolute top-4 left-4 z-20">
+        <div className="absolute top-6 left-6 z-20">
           <img 
             src={connect4Image}
             alt="Connect 4"
-            className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} object-contain`}
+            className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} object-contain drop-shadow-md`}
             data-testid="img-connect4"
           />
         </div>
         
-        {/* Main Concessions Connection image in center */}
-        <div className="relative w-full flex justify-center">
-          <img 
-            src={getConcessionsImage()}
-            alt="Concessions Connection"
-            className="w-full max-w-4xl h-auto object-contain"
-            data-testid="img-hero-concessions"
-          />
+        {/* Hero Banner Container - Centered and Prominent */}
+        <div className="relative w-full flex flex-col items-center justify-center space-y-6 px-4 min-h-[45vh] md:min-h-[55vh]">
+          {/* Main Concessions Connection Logo - Prominently Centered */}
+          <div className="relative flex justify-center items-center w-full">
+            <div className="relative bg-white/10 backdrop-blur-sm rounded-3xl p-6 md:p-8 shadow-2xl border border-white/20 transform hover:scale-105 transition-all duration-300">
+              <img 
+                src={getConcessionsImage()}
+                alt="Concessions Connection - Family Food Truck"
+                className={`${isMobile ? 'max-w-[320px]' : 'max-w-[550px]'} w-full h-auto object-contain drop-shadow-lg`}
+                data-testid="img-hero-concessions"
+              />
+              {/* Subtle glow effect behind logo */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 rounded-3xl blur-xl -z-10"></div>
+            </div>
+          </div>
+          
+          {/* Linking Banner - Enhanced positioning below main logo */}
+          <div className="relative w-full flex justify-center">
+            <div className="relative bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 shadow-lg border border-white/10 transform hover:scale-102 transition-all duration-300">
+              <img 
+                src={getLinkingImage()}
+                alt="Linking families through tastes and experiences"
+                className={`${isMobile ? 'max-w-[280px]' : 'max-w-[450px]'} w-full h-auto object-contain drop-shadow-md`}
+                data-testid="img-linking-banner"
+              />
+            </div>
+          </div>
         </div>
         
-        {/* Linking banner below hero */}
-        <div className="w-full flex justify-center mt-2">
-          <img 
-            src={getLinkingImage()}
-            alt="Linking families through tastes and experiences"
-            className="w-full max-w-3xl h-auto object-contain"
-            data-testid="img-linking-banner"
-          />
-        </div>
+        {/* Decorative background elements for visual appeal */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] h-[90%] bg-gradient-radial from-primary/8 via-transparent to-transparent rounded-full blur-3xl -z-10"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-accent/5 via-transparent to-primary/5 -z-20"></div>
       </section>
 
       {/* Menu Categories */}
