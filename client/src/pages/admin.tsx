@@ -74,8 +74,8 @@ function AISettingsTab() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="p-6 flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />
         <span className="ml-2">Loading AI settings...</span>
       </div>
     );
@@ -85,8 +85,8 @@ function AISettingsTab() {
     <div className="p-6 space-y-6">
       {/* Error Alert */}
       {error && (
-        <Alert variant="destructive" data-testid="alert-ai-settings-error">
-          <AlertTriangle className="h-4 w-4" />
+        <Alert variant="destructive" data-testid="alert-ai-settings-error" role="alert" aria-live="assertive">
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
           <AlertTitle>Failed to Load AI Settings</AlertTitle>
           <AlertDescription>
             {error?.message || "Unable to fetch AI settings. Please check your connection and try again."}
@@ -96,10 +96,10 @@ function AISettingsTab() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-ai-settings">
-            <Bot className="w-6 h-6 text-blue-600" />
+          <h1 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-ai-settings">
+            <Bot className="w-6 h-6 text-blue-600" aria-hidden="true" />
             <span>AI Settings</span>
-          </h2>
+          </h1>
           <p className="text-muted-foreground">Configure AI functionality and features across the application</p>
         </div>
         <div className="flex items-center space-x-2">
@@ -112,8 +112,12 @@ function AISettingsTab() {
             onCheckedChange={handleAIToggle}
             disabled={updateAISettingsMutation.isPending || error}
             data-testid="switch-ai-enabled"
-            aria-label="Toggle AI functionality"
+            aria-label={`Toggle AI functionality - currently ${isAIEnabled ? 'enabled' : 'disabled'}`}
+            aria-describedby="ai-toggle-description"
           />
+          <span id="ai-toggle-description" className="sr-only">
+            When enabled, AI features like voice assistant and smart recommendations will be available to customers.
+          </span>
         </div>
       </div>
 
@@ -123,31 +127,31 @@ function AISettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Zap className="w-5 h-5" />
+            <Zap className="w-5 h-5" aria-hidden="true" />
             <span>AI Status</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">AI Functionality</Label>
-              <div className="flex items-center space-x-2 mt-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="table" aria-label="AI system status information">
+            <div role="row">
+              <Label className="text-sm font-medium text-muted-foreground" role="rowheader">AI Functionality</Label>
+              <div className="flex items-center space-x-2 mt-1" role="cell">
                 {isAIEnabled ? (
                   <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full" />
-                    <span className="text-sm font-medium text-green-600" data-testid="text-ai-status">Enabled</span>
+                    <div className="w-2 h-2 bg-green-500 rounded-full" aria-hidden="true" />
+                    <span className="text-sm font-medium text-green-600" data-testid="text-ai-status" aria-label="AI functionality is enabled">Enabled</span>
                   </>
                 ) : (
                   <>
-                    <div className="w-2 h-2 bg-red-500 rounded-full" />
-                    <span className="text-sm font-medium text-red-600" data-testid="text-ai-status">Disabled</span>
+                    <div className="w-2 h-2 bg-red-500 rounded-full" aria-hidden="true" />
+                    <span className="text-sm font-medium text-red-600" data-testid="text-ai-status" aria-label="AI functionality is disabled">Disabled</span>
                   </>
                 )}
               </div>
             </div>
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
-              <p className="text-sm font-medium mt-1" data-testid="text-ai-last-updated">
+            <div role="row">
+              <Label className="text-sm font-medium text-muted-foreground" role="rowheader">Last Updated</Label>
+              <p className="text-sm font-medium mt-1" data-testid="text-ai-last-updated" role="cell" aria-label={`Last updated: ${aiSettings?.updatedAt ? new Date(aiSettings.updatedAt).toLocaleString() : 'Never'}`}>
                 {aiSettings?.updatedAt ? new Date(aiSettings.updatedAt).toLocaleString() : 'Never'}
               </p>
             </div>
@@ -159,24 +163,24 @@ function AISettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Bot className="w-5 h-5" />
+            <Bot className="w-5 h-5" aria-hidden="true" />
             <span>AI Features</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Voice Assistant</h4>
+          <div className="space-y-4" role="list" aria-label="Available AI features">
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800" role="listitem">
+              <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Voice Assistant</h3>
               <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
                 AI-powered voice assistant that helps customers navigate the menu and place orders.
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
+                <span className="text-sm font-medium" aria-label={`Voice Assistant status: ${isAIEnabled ? 'Available' : 'Disabled'}`}>
                   Status: {isAIEnabled ? 'Available' : 'Disabled'}
                 </span>
                 {isAIEnabled && (
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <div className="flex items-center space-x-1" role="status" aria-live="polite">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
                     <span className="text-xs text-green-600">Active</span>
                   </div>
                 )}
@@ -287,8 +291,8 @@ function UserManagementTab() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="p-6 flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />
         <span className="ml-2">Loading users...</span>
       </div>
     );
@@ -298,8 +302,8 @@ function UserManagementTab() {
     <div className="p-6 space-y-6">
       {/* Error Alert */}
       {error && (
-        <Alert variant="destructive" data-testid="alert-user-management-error">
-          <AlertTriangle className="h-4 w-4" />
+        <Alert variant="destructive" data-testid="alert-user-management-error" role="alert" aria-live="assertive">
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
           <AlertTitle>Failed to Load Users</AlertTitle>
           <AlertDescription>
             {error?.message || "Unable to fetch users. Please check your connection and try again."}
@@ -310,7 +314,7 @@ function UserManagementTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-user-management">
-            <Users className="w-6 h-6 text-blue-600" />
+            <Users className="w-6 h-6 text-blue-600" aria-hidden="true" />
             <span>User Management</span>
           </h2>
           <p className="text-muted-foreground">Search and manage user roles and permissions</p>
@@ -323,30 +327,40 @@ function UserManagementTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Search className="w-5 h-5" />
+            <Search className="w-5 h-5" aria-hidden="true" />
             <span>Search Users</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center space-x-2">
+            <Label htmlFor="user-search-input" className="sr-only">
+              Search users by email address
+            </Label>
             <Input
+              id="user-search-input"
               placeholder="Search by email address..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               data-testid="input-user-search"
               className="flex-1"
+              aria-describedby="search-instructions"
             />
             <Button 
               variant="outline" 
               onClick={() => refetch()}
               disabled={isLoading}
               data-testid="button-refresh-users"
+              aria-label="Refresh user list"
+              className="focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
-              <Search className="w-4 h-4" />
+              <Search className="w-4 h-4" aria-hidden="true" />
             </Button>
           </div>
+          <div id="search-instructions" className="text-xs text-muted-foreground mt-1">
+            Search automatically updates as you type. Press the refresh button to reload all users.
+          </div>
           {debouncedSearchTerm && (
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-sm text-muted-foreground mt-2" aria-live="polite">
               Searching for: "{debouncedSearchTerm}"
             </p>
           )}

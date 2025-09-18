@@ -241,11 +241,12 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
 
   if (isLoading) {
     return (
-      <Card className="w-full max-w-md mx-auto">
+      <Card className="w-full max-w-md mx-auto" role="dialog" aria-labelledby="loading-title" aria-describedby="loading-description">
         <CardContent className="flex items-center justify-center py-8">
           <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Loading payment form...</p>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" aria-hidden="true" />
+            <h2 id="loading-title" className="sr-only">Payment Form Loading</h2>
+            <p id="loading-description" aria-live="polite">Loading payment form...</p>
           </div>
         </CardContent>
       </Card>
@@ -255,45 +256,46 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
   // Show service unavailable message when Square is not configured
   if (!squareConfigured) {
     return (
-      <Card className="w-full max-w-md mx-auto">
+      <Card className="w-full max-w-md mx-auto" role="dialog" aria-labelledby="unavailable-title" aria-describedby="unavailable-description">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-600">
-            <CreditCard className="h-5 w-5" />
+          <CardTitle id="unavailable-title" className="flex items-center gap-2 text-amber-600">
+            <CreditCard className="h-5 w-5" aria-hidden="true" />
             Payment Service Unavailable
           </CardTitle>
           <CardDescription>
-            Total: <span className="font-semibold text-lg">${amount.toFixed(2)}</span>
+            Total: <span className="font-semibold text-lg" aria-label="Total amount: ${amount.toFixed(2)}">${amount.toFixed(2)}</span>
           </CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-6">
-          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-            <AlertDescription className="text-amber-800 dark:text-amber-200">
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800" role="alert" aria-live="polite">
+            <AlertDescription id="unavailable-description" className="text-amber-800 dark:text-amber-200">
               <div className="space-y-2">
                 <p className="font-medium">💳 Online payment is temporarily unavailable</p>
                 <p className="text-sm">
                   Our payment processing service is currently being configured. 
                   Please try one of these alternatives:
                 </p>
-                <ul className="text-sm list-disc list-inside ml-4 space-y-1">
-                  <li>Pay in person when picking up your order</li>
-                  <li>Contact us directly to arrange payment</li>
-                  <li>Try again later</li>
+                <ul className="text-sm list-disc list-inside ml-4 space-y-1" role="list">
+                  <li role="listitem">Pay in person when picking up your order</li>
+                  <li role="listitem">Contact us directly to arrange payment</li>
+                  <li role="listitem">Try again later</li>
                 </ul>
               </div>
             </AlertDescription>
           </Alert>
 
           {/* Disabled Payment Options */}
-          <div className="space-y-3 opacity-60">
-            <p className="text-sm font-medium text-muted-foreground">Payment Options (Unavailable)</p>
+          <fieldset className="space-y-3 opacity-60" disabled aria-describedby="unavailable-description">
+            <legend className="text-sm font-medium text-muted-foreground">Payment Options (Unavailable)</legend>
             
             <Button
               disabled
               className="w-full bg-black text-white cursor-not-allowed"
               data-testid="button-apple-pay-disabled"
+              aria-label="Apple Pay - currently unavailable"
             >
-              <Smartphone className="h-4 w-4 mr-2" />
+              <Smartphone className="h-4 w-4 mr-2" aria-hidden="true" />
               Apple Pay (Unavailable)
             </Button>
 
@@ -301,8 +303,9 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
               disabled
               className="w-full bg-blue-600 text-white cursor-not-allowed"
               data-testid="button-google-pay-disabled"
+              aria-label="Google Pay - currently unavailable"
             >
-              <Smartphone className="h-4 w-4 mr-2" />
+              <Smartphone className="h-4 w-4 mr-2" aria-hidden="true" />
               Google Pay (Unavailable)
             </Button>
 
@@ -310,11 +313,12 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
               disabled
               className="w-full cursor-not-allowed"
               data-testid="button-card-pay-disabled"
+              aria-label="Pay with Card - currently unavailable"
             >
-              <CreditCard className="h-4 w-4 mr-2" />
+              <CreditCard className="h-4 w-4 mr-2" aria-hidden="true" />
               Pay with Card (Unavailable)
             </Button>
-          </div>
+          </fieldset>
 
           {/* Alternative Contact Info */}
           <div className="text-xs text-muted-foreground text-center space-y-1">
@@ -326,8 +330,9 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
           <Button
             variant="outline"
             onClick={onCancel}
-            className="w-full"
+            className="w-full focus:ring-2 focus:ring-primary focus:ring-offset-2"
             data-testid="button-cancel-payment"
+            aria-label="Close payment form and return to order"
           >
             Close
           </Button>
@@ -337,29 +342,29 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto" role="dialog" aria-labelledby="payment-title" aria-describedby="payment-description">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5" />
+        <CardTitle id="payment-title" className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5" aria-hidden="true" />
           Complete Payment
         </CardTitle>
-        <CardDescription>
-          Total: <span className="font-semibold text-lg">${amount.toFixed(2)}</span>
+        <CardDescription id="payment-description">
+          Total: <span className="font-semibold text-lg" aria-label="Total amount: ${amount.toFixed(2)}">${amount.toFixed(2)}</span>
         </CardDescription>
       </CardHeader>
       
       <CardContent className="space-y-6">
         {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" role="alert" aria-live="assertive">
+            <AlertDescription id="payment-error">{error}</AlertDescription>
           </Alert>
         )}
 
         {/* Digital Wallet Options */}
         {(applePayAvailable || googlePayAvailable) && (
           <>
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">Quick Pay Options</p>
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-medium text-muted-foreground">Quick Pay Options</legend>
               
               {applePayAvailable && (
                 <Button
@@ -399,13 +404,15 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
                     }
                   }}
                   disabled={isProcessing}
-                  className="w-full bg-black hover:bg-gray-800 text-white"
+                  className="w-full bg-black hover:bg-gray-800 text-white focus:ring-2 focus:ring-gray-600 focus:ring-offset-2"
                   data-testid="button-apple-pay"
+                  aria-label={isProcessing ? "Processing Apple Pay payment..." : `Pay ${amount.toFixed(2)} with Apple Pay`}
+                  aria-describedby={error ? "payment-error" : undefined}
                 >
                   {isProcessing ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden="true" />
                   ) : (
-                    <Smartphone className="h-4 w-4 mr-2" />
+                    <Smartphone className="h-4 w-4 mr-2" aria-hidden="true" />
                   )}
                   Pay with Apple Pay
                 </Button>
@@ -445,72 +452,83 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
                     }
                   }}
                   disabled={isProcessing}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
                   data-testid="button-google-pay"
+                  aria-label={isProcessing ? "Processing Google Pay payment..." : `Pay ${amount.toFixed(2)} with Google Pay`}
+                  aria-describedby={error ? "payment-error" : undefined}
                 >
                   {isProcessing ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden="true" />
                   ) : (
-                    <Smartphone className="h-4 w-4 mr-2" />
+                    <Smartphone className="h-4 w-4 mr-2" aria-hidden="true" />
                   )}
                   Pay with Google Pay
                 </Button>
               )}
-            </div>
+            </fieldset>
             
-            <div className="flex items-center gap-4">
-              <Separator className="flex-1" />
+            <div className="flex items-center gap-4" role="separator" aria-label="Alternative payment methods">
+              <Separator className="flex-1" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">OR</span>
-              <Separator className="flex-1" />
+              <Separator className="flex-1" aria-hidden="true" />
             </div>
           </>
         )}
 
         {/* Card Payment Form */}
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-muted-foreground">Pay with Card</p>
+        <fieldset className="space-y-4">
+          <legend className="text-sm font-medium text-muted-foreground">Pay with Card</legend>
           
           {/* Square Card Container */}
           <div 
             id="card-container" 
             className="min-h-[120px] p-4 border border-border rounded-md bg-background"
             data-testid="card-container"
+            role="group"
+            aria-label="Credit card information"
+            aria-describedby={error ? "payment-error" : "card-instructions"}
           />
+          <div id="card-instructions" className="sr-only">
+            Enter your credit card details. All fields are required. Your payment information is secure and encrypted.
+          </div>
           
           <Button
             onClick={() => paymentForm?.requestCardNonce()}
             disabled={isProcessing}
-            className="w-full"
+            className="w-full focus:ring-2 focus:ring-primary focus:ring-offset-2"
             data-testid="button-pay-card"
+            aria-label={isProcessing ? "Processing payment, please wait..." : `Pay ${amount.toFixed(2)} with credit card`}
+            aria-describedby={error ? "payment-error" : undefined}
           >
             {isProcessing ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Processing Payment...
+                <Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden="true" />
+                <span aria-live="polite">Processing Payment...</span>
               </>
             ) : (
               <>
-                <CreditCard className="h-4 w-4 mr-2" />
+                <CreditCard className="h-4 w-4 mr-2" aria-hidden="true" />
                 Pay ${amount.toFixed(2)}
               </>
             )}
           </Button>
-        </div>
+        </fieldset>
 
         {/* Cancel Button */}
         <Button
           variant="outline"
           onClick={onCancel}
           disabled={isProcessing}
-          className="w-full"
+          className="w-full focus:ring-2 focus:ring-primary focus:ring-offset-2"
           data-testid="button-cancel-payment"
+          aria-label="Cancel payment and return to order"
         >
           Cancel
         </Button>
 
         {/* Security Notice */}
-        <div className="text-xs text-muted-foreground text-center space-y-1">
-          <p>🔒 Your payment information is secure</p>
+        <div className="text-xs text-muted-foreground text-center space-y-1" role="note" aria-label="Security information">
+          <p><span aria-hidden="true">🔒</span> Your payment information is secure</p>
           <p>Powered by Square</p>
         </div>
       </CardContent>

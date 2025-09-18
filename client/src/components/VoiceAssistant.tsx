@@ -103,33 +103,47 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
     <div 
       className="fixed bottom-20 left-4 right-4 z-50"
       data-testid="voice-assistant"
+      role="dialog"
+      aria-labelledby="voice-assistant-title"
+      aria-describedby="voice-assistant-description"
+      aria-modal="true"
     >
       <Card className="shadow-xl border border-border animate-in slide-in-from-bottom-4">
         <CardContent className="p-4">
           <div className="flex items-center space-x-3 mb-3">
-            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center" aria-hidden="true">
               <i className="fas fa-robot text-white"></i>
             </div>
             <div>
-              <h3 className="font-heading font-semibold">AI Hostess</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 id="voice-assistant-title" className="font-heading font-semibold">AI Hostess</h3>
+              <p 
+                id="voice-assistant-status"
+                className="text-sm text-muted-foreground"
+                aria-live="polite"
+                role="status"
+              >
                 {isListening ? "Listening..." : isProcessing ? "Processing..." : isSpeaking ? "Speaking..." : "Ready"}
               </p>
             </div>
             <Button 
               size="sm"
               variant="ghost"
-              className="ml-auto w-8 h-8 rounded-full p-0"
+              className="ml-auto w-10 h-10 rounded-full p-0 focus:ring-2 focus:ring-primary focus:ring-offset-2"
               onClick={onClose}
               data-testid="button-close-voice"
+              aria-label="Close AI assistant"
             >
-              <i className="fas fa-times text-sm"></i>
+              <i className="fas fa-times text-sm" aria-hidden="true"></i>
             </Button>
           </div>
           
           {/* Voice waveform visualization */}
           {(isListening || isProcessing) && (
-            <div className="flex items-center justify-center space-x-1 mb-3">
+            <div 
+              className="flex items-center justify-center space-x-1 mb-3"
+              aria-hidden="true"
+              role="presentation"
+            >
               {[...Array(5)].map((_, i) => (
                 <div
                   key={i}
@@ -143,25 +157,43 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
             </div>
           )}
           
-          <div className="bg-muted rounded-xl p-3 mb-3">
-            <p className="text-sm" data-testid="text-voice-message">
+          <div 
+            className="bg-muted rounded-xl p-3 mb-3"
+            role="region"
+            aria-labelledby="assistant-message-label"
+          >
+            <span id="assistant-message-label" className="sr-only">AI Assistant Message</span>
+            <p 
+              className="text-sm" 
+              data-testid="text-voice-message"
+              aria-live="polite"
+              id="voice-assistant-description"
+            >
               {message}
             </p>
           </div>
 
           {!isAIEnabled && (
-            <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <div 
+              className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800"
+              role="alert"
+              aria-live="polite"
+            >
               <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                <AlertTriangle className="w-4 h-4 text-yellow-600" aria-hidden="true" />
                 <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">AI Features Disabled</span>
               </div>
               <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                Contact an administrator to enable AI voice assistance.
+                Voice features are unavailable. You can still use the suggested action buttons below to interact with the assistant.
               </p>
             </div>
           )}
           
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div 
+            className="flex flex-wrap gap-2 mb-3"
+            role="group"
+            aria-label="Quick action buttons - alternative to voice commands"
+          >
             {suggestedActions.map(action => (
               <Button
                 key={action}
@@ -169,22 +201,42 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
                 variant="outline"
                 onClick={() => handleAction(action)}
                 data-testid={`button-action-${action}`}
+                className="focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                aria-label={`Quick action: ${action.replace('_', ' ')}`}
               >
                 {action.replace('_', ' ')}
               </Button>
             ))}
           </div>
 
-          <div className="flex space-x-2">
-            <Button 
-              className="flex-1"
-              onClick={isListening ? stopListening : startListening}
-              disabled={isProcessing || !isAIEnabled}
-              data-testid="button-voice-toggle"
-            >
-              <i className={`fas ${isListening ? 'fa-stop' : 'fa-microphone'} mr-2`}></i>
-              {!isAIEnabled ? 'AI Disabled' : (isListening ? 'Stop' : 'Talk')}
-            </Button>
+          <div className="space-y-2">
+            <div className="flex space-x-2">
+              <Button 
+                className="flex-1 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                onClick={isListening ? stopListening : startListening}
+                disabled={isProcessing || !isAIEnabled}
+                data-testid="button-voice-toggle"
+                aria-label={
+                  !isAIEnabled 
+                    ? 'Voice commands disabled - use action buttons instead' 
+                    : isListening 
+                      ? 'Stop listening for voice commands' 
+                      : 'Start listening for voice commands'
+                }
+                aria-describedby="voice-instructions"
+              >
+                <i className={`fas ${isListening ? 'fa-stop' : 'fa-microphone'} mr-2`} aria-hidden="true"></i>
+                {!isAIEnabled ? 'AI Disabled' : (isListening ? 'Stop' : 'Talk')}
+              </Button>
+            </div>
+            
+            {/* Instructions for accessibility */}
+            <div id="voice-instructions" className="text-xs text-muted-foreground text-center">
+              {!isAIEnabled 
+                ? 'Voice commands are disabled. Use the action buttons above to interact.'
+                : 'Click Talk to speak, or use the action buttons above for quick commands.'
+              }
+            </div>
           </div>
         </CardContent>
       </Card>
