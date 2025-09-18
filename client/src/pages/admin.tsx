@@ -1,23 +1,372 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   MapPin, 
   Menu, 
   Calendar, 
   Palette, 
   Clock, 
-  Truck
+  Truck,
+  Loader2,
+  Navigation,
+  AlertTriangle
 } from "lucide-react";
 
-// Individual tab components (will implement these in subsequent tasks)
+// GPS Locator Tab Implementation
 function GPSLocatorTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationForm, setLocationForm] = useState({
+    latitude: "",
+    longitude: "",
+    address: "",
+    radius: "5.00"
+  });
+
+  // Fetch current truck location
+  const { data: truckLocation, isLoading, error } = useQuery({
+    queryKey: ['/api/admin/location'],
+    queryFn: () => apiRequest('/api/admin/location'),
+    select: (data) => data || null
+  }) as { data: any, isLoading: boolean, error: any };
+
+  // Update truck location mutation
+  const updateLocationMutation = useMutation({
+    mutationFn: (locationData: any) => {
+      const token = localStorage.getItem('auth_token');
+      return fetch('/api/admin/location', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(locationData)
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update location');
+        return res.json();
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/location'] });
+      toast({
+        title: "Location Updated",
+        description: "Truck location has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update truck location. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Get current GPS location using browser geolocation
+  const getCurrentLocation = () => {
+    setIsGettingLocation(true);
+    
+    if (!navigator.geolocation) {
+      toast({
+        title: "Error",
+        description: "Geolocation is not supported by this browser.",
+        variant: "destructive",
+      });
+      setIsGettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocationForm(prev => ({
+          ...prev,
+          latitude: latitude.toFixed(6),
+          longitude: longitude.toFixed(6)
+        }));
+        setIsGettingLocation(false);
+        toast({
+          title: "Location Retrieved",
+          description: "Current GPS coordinates have been loaded.",
+        });
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        toast({
+          title: "Error",
+          description: "Unable to retrieve your current location. Please enter coordinates manually.",
+          variant: "destructive",
+        });
+        setIsGettingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    );
+  };
+
+  // Handle GPS toggle
+  const handleGPSToggle = (enabled: boolean) => {
+    const locationData = {
+      ...truckLocation,
+      gpsEnabled: enabled,
+      latitude: enabled ? (locationForm.latitude ? parseFloat(locationForm.latitude) : null) : null,
+      longitude: enabled ? (locationForm.longitude ? parseFloat(locationForm.longitude) : null) : null,
+      address: locationForm.address || null,
+      radius: locationForm.radius || "5.00"
+    };
+    updateLocationMutation.mutate(locationData);
+  };
+
+  // Handle location save
+  const handleSaveLocation = () => {
+    if (!locationForm.latitude || !locationForm.longitude) {
+      toast({
+        title: "Error",
+        description: "Please provide both latitude and longitude coordinates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const locationData = {
+      gpsEnabled: truckLocation?.gpsEnabled ?? true,
+      latitude: parseFloat(locationForm.latitude),
+      longitude: parseFloat(locationForm.longitude),
+      address: locationForm.address || null,
+      radius: locationForm.radius || "5.00"
+    };
+    updateLocationMutation.mutate(locationData);
+  };
+
+  // Initialize form when data loads
+  useEffect(() => {
+    if (truckLocation) {
+      setLocationForm({
+        latitude: truckLocation.latitude?.toString() || "",
+        longitude: truckLocation.longitude?.toString() || "",
+        address: truckLocation.address || "",
+        radius: truckLocation.radius?.toString() || "5.00"
+      });
+    }
+  }, [truckLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading location settings...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">GPS Locator</h2>
-      <p className="text-muted-foreground">GPS location and tracking settings will be implemented here.</p>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">GPS Locator</h2>
+          <p className="text-muted-foreground">Manage truck location and GPS tracking settings</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="gps-toggle" className="text-sm font-medium">
+            GPS Tracking
+          </Label>
+          <Switch
+            id="gps-toggle"
+            checked={truckLocation?.gpsEnabled ?? false}
+            onCheckedChange={handleGPSToggle}
+            disabled={updateLocationMutation.isPending}
+            data-testid="switch-gps-enabled"
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Current Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <MapPin className="w-5 h-5" />
+            <span>Current Status</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">GPS Status</Label>
+              <div className="flex items-center space-x-2 mt-1">
+                {truckLocation?.gpsEnabled ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="text-sm font-medium text-green-600">Enabled</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                    <span className="text-sm font-medium text-red-600">Disabled</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Service Radius</Label>
+              <p className="text-sm font-medium mt-1">{truckLocation?.radius || "5.00"} km</p>
+            </div>
+          </div>
+          
+          {truckLocation?.latitude && truckLocation?.longitude && (
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Coordinates</Label>
+              <p className="text-sm font-mono mt-1">
+                {truckLocation.latitude.toFixed(6)}, {truckLocation.longitude.toFixed(6)}
+              </p>
+            </div>
+          )}
+          
+          {truckLocation?.address && (
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+              <p className="text-sm mt-1">{truckLocation.address}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Location Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Navigation className="w-5 h-5" />
+            <span>Update Location</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex space-x-2">
+            <Button
+              onClick={getCurrentLocation}
+              disabled={isGettingLocation || updateLocationMutation.isPending}
+              variant="outline"
+              className="flex items-center space-x-2"
+              data-testid="button-get-current-location"
+            >
+              {isGettingLocation ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Navigation className="w-4 h-4" />
+              )}
+              <span>{isGettingLocation ? "Getting Location..." : "Get Current Location"}</span>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="latitude">Latitude</Label>
+              <Input
+                id="latitude"
+                type="number"
+                step="0.000001"
+                placeholder="40.712776"
+                value={locationForm.latitude}
+                onChange={(e) => setLocationForm(prev => ({ ...prev, latitude: e.target.value }))}
+                data-testid="input-latitude"
+              />
+            </div>
+            <div>
+              <Label htmlFor="longitude">Longitude</Label>
+              <Input
+                id="longitude"
+                type="number"
+                step="0.000001"
+                placeholder="-74.005974"
+                value={locationForm.longitude}
+                onChange={(e) => setLocationForm(prev => ({ ...prev, longitude: e.target.value }))}
+                data-testid="input-longitude"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="address">Address (Optional)</Label>
+            <Input
+              id="address"
+              placeholder="123 Main St, City, State 12345"
+              value={locationForm.address}
+              onChange={(e) => setLocationForm(prev => ({ ...prev, address: e.target.value }))}
+              data-testid="input-address"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="radius">Service Radius (km)</Label>
+            <Input
+              id="radius"
+              type="number"
+              step="0.1"
+              min="0.1"
+              max="50"
+              placeholder="5.00"
+              value={locationForm.radius}
+              onChange={(e) => setLocationForm(prev => ({ ...prev, radius: e.target.value }))}
+              data-testid="input-radius"
+            />
+          </div>
+
+          <Button
+            onClick={handleSaveLocation}
+            disabled={updateLocationMutation.isPending}
+            className="w-full"
+            data-testid="button-save-location"
+          >
+            {updateLocationMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving Location...
+              </>
+            ) : (
+              "Save Location"
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Map Preview Placeholder */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <MapPin className="w-5 h-5" />
+            <span>Location Preview</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-muted rounded-lg h-64 flex items-center justify-center border border-dashed border-muted-foreground/30">
+            <div className="text-center space-y-2">
+              <MapPin className="w-12 h-12 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Interactive map integration will be added here
+              </p>
+              {truckLocation?.latitude && truckLocation?.longitude && (
+                <p className="text-xs text-muted-foreground font-mono">
+                  {truckLocation.latitude.toFixed(6)}, {truckLocation.longitude.toFixed(6)}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
