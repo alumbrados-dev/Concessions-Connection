@@ -57,7 +57,7 @@ export default function About() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onActivateVoice={() => {}} />
+      <Header />
       
       <div className="p-4 space-y-6 pb-24">
         {/* About Us Section */}
