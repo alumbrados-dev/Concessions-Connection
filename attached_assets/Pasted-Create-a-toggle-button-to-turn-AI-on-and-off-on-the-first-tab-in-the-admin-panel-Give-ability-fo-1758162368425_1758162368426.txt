@@ -1,0 +1,15 @@
+Create a toggle button to turn AI on and off on the first tab in the admin panel.
+
+- Give ability for admin to query the database.  email addresses are either administrators or customers.  Administrators will be given the link to the admin panel in their drop down menu.  Administrators will have a search features to search email addresses in the database and delegate the administer privilige to whom they search for and place a checkmark by their name; changing the individuals status from customer to administrator.  For now the default administrator is the developer with email address stace.mitchell27@gmail.com.
+
+What about the push notifications we spoke about?  SHould the customer be asked if they want to be notified?  Lets keep it clean and legit.  
+- include a box next to each menu item too. Place a "?" mark by it, just hovering above and to the right.. and if clicked, it tells the admin that this suggested 'sales tax' per item. ensure they understand that the entire order, in the case of Maryland will be 6%.. but allow them to adjust and change it accordingly; just put the 6% in the box.  - Points System: Toggle button on first page (post-login): "Enable Points (Earn 10 points per $10 spent)?". Users opt in/out; if enabled, points accrue in users.points (e.g., 100 points = free item). Hidden/disabled if admin toggles off globally. Ties to AI hostess for offers ("20 points to a free drink!").
+- Push: Capacitor Push Notifications; request permission on opt-in.
+- a paywall to Square and the ability to allow users to use either Grubhub or Doordash for their pick up and delivery.  
+- I'd like the Concessions Connection banner moved to the hero banner [Centered]
+- Remove the pink bubble "Concessions Connection" & Annandale, VA text.
+- Compress the About App Window vertically.  Remove everything below "on Instagram" but keep the close button and remove the pink square bubble on top.
+
+Revenue Models:
+Ads: Sponsored banners (CPC/flat fee) in ads table (sponsored: boolean); track clicks for invoicing.
+Events: Sponsored listings (sponsored: boolean in local_events); affiliate/ticket upsells.

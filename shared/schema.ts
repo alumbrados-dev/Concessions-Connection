@@ -49,6 +49,11 @@ export const orders = pgTable("orders", {
   items: jsonb("items").notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: text("status").default("pending"),
+  paymentStatus: text("payment_status").default("pending"), // pending, processing, completed, failed
+  transactionId: text("transaction_id"), // Square transaction ID
+  paymentMethod: text("payment_method"), // card, apple_pay, google_pay
+  paymentAmount: decimal("payment_amount", { precision: 10, scale: 2 }),
+  paymentCurrency: text("payment_currency").default("USD"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

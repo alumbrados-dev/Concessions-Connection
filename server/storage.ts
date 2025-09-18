@@ -35,8 +35,10 @@ export interface IStorage {
 
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
+  getOrder(orderId: string): Promise<Order | undefined>;
   getUserOrders(userId: string): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
+  updateOrderPaymentStatus(orderId: string, paymentStatus: string, transactionId?: string, paymentMethod?: string): Promise<Order | undefined>;
 
   // Truck location operations
   getTruckLocation(): Promise<TruckLocation | undefined>;
@@ -1018,10 +1020,60 @@ export class DatabaseStorage implements IStorage {
         ...insertOrder,
         id,
         status: insertOrder.status ?? "pending",
+        paymentStatus: insertOrder.paymentStatus ?? "pending",
+        transactionId: insertOrder.transactionId ?? null,
+        paymentMethod: insertOrder.paymentMethod ?? null,
+        paymentAmount: insertOrder.paymentAmount ?? null,
+        paymentCurrency: insertOrder.paymentCurrency ?? "USD",
         createdAt: new Date(),
       };
       this.fallbackData.orders.set(id, order);
       return order;
+    }
+  }
+
+  async getOrder(orderId: string): Promise<Order | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.orders.get(orderId);
+    }
+    
+    try {
+      const result = await db.select().from(orders).where(eq(orders.id, orderId));
+      return result[0];
+    } catch (error) {
+      return this.fallbackData.orders.get(orderId);
+    }
+  }
+
+  async updateOrderPaymentStatus(orderId: string, paymentStatus: string, transactionId?: string, paymentMethod?: string): Promise<Order | undefined> {
+    await this.ensureInitialized();
+    
+    try {
+      const updates: any = { paymentStatus };
+      if (transactionId) updates.transactionId = transactionId;
+      if (paymentMethod) updates.paymentMethod = paymentMethod;
+      
+      const result = await db.update(orders)
+        .set(updates)
+        .where(eq(orders.id, orderId))
+        .returning();
+      return result[0];
+    } catch (error) {
+      // Fallback mode
+      const existingOrder = this.fallbackData.orders.get(orderId);
+      if (existingOrder) {
+        const updatedOrder = {
+          ...existingOrder,
+          paymentStatus,
+          ...(transactionId && { transactionId }),
+          ...(paymentMethod && { paymentMethod })
+        };
+        this.fallbackData.orders.set(orderId, updatedOrder);
+        return updatedOrder;
+      }
+      return undefined;
     }
   }
 

@@ -11,8 +11,51 @@ import {
   insertTruckLocationSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { SquareClient, SquareEnvironment } from "square";
+import { randomUUID } from "crypto";
+import jwt from "jsonwebtoken";
 
-// Admin authentication middleware
+// JWT Secret - In production, this should be a strong random secret from environment variables
+const JWT_SECRET = process.env.JWT_SECRET || 'concession-connection-dev-secret-key-change-in-production';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+
+// Helper functions for JWT token management
+function generateSecureToken(userId: string, email: string): string {
+  return jwt.sign(
+    { 
+      userId, 
+      email,
+      iat: Math.floor(Date.now() / 1000),
+      // Add entropy to prevent token guessing
+      nonce: randomUUID() 
+    },
+    JWT_SECRET,
+    { 
+      expiresIn: JWT_EXPIRES_IN,
+      issuer: 'concession-connection',
+      audience: 'concession-connection-users'
+    }
+  );
+}
+
+function verifySecureToken(token: string): { userId: string; email: string } | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET, {
+      issuer: 'concession-connection',
+      audience: 'concession-connection-users'
+    }) as any;
+    
+    return {
+      userId: payload.userId,
+      email: payload.email
+    };
+  } catch (error) {
+    console.error('JWT verification failed:', error);
+    return null;
+  }
+}
+
+// Secure admin authentication middleware using JWT
 async function requireAdmin(req: any, res: any, next: any) {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -20,11 +63,22 @@ async function requireAdmin(req: any, res: any, next: any) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const userId = Buffer.from(token, 'base64').toString();
-    const user = await storage.getUser(userId);
+    // Verify JWT token
+    const tokenData = verifySecureToken(token);
+    if (!tokenData) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    // Get user from database using verified user ID
+    const user = await storage.getUser(tokenData.userId);
     
     if (!user) {
-      return res.status(401).json({ error: "Invalid token" });
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    // Verify email matches token (prevents token reuse if user email changes)
+    if (user.email !== tokenData.email) {
+      return res.status(401).json({ error: "Token email mismatch" });
     }
 
     // Strict admin allowlist - only these exact emails have admin access
@@ -43,6 +97,7 @@ async function requireAdmin(req: any, res: any, next: any) {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Admin authentication failed:', error);
     res.status(401).json({ error: "Authentication failed" });
   }
 }
@@ -84,8 +139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // In production, generate a proper JWT or session token
-      const token = Buffer.from(user.id).toString('base64');
+      // Generate secure JWT token
+      const token = generateSecureToken(user.id, user.email);
       
       res.json({ success: true, token, user });
     } catch (error) {
@@ -100,16 +155,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "No token provided" });
       }
 
-      const userId = Buffer.from(token, 'base64').toString();
-      const user = await storage.getUser(userId);
+      // Verify JWT token
+      const tokenData = verifySecureToken(token);
+      if (!tokenData) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      // Get user from database using verified user ID
+      const user = await storage.getUser(tokenData.userId);
       
       if (!user) {
-        return res.status(401).json({ error: "Invalid token" });
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify email matches token (prevents token reuse if user email changes)
+      if (user.email !== tokenData.email) {
+        return res.status(401).json({ error: "Token email mismatch" });
       }
 
       res.json({ user });
     } catch (error) {
-      res.status(401).json({ error: "Invalid token" });
+      console.error('Token verification failed:', error);
+      res.status(401).json({ error: "Invalid or expired token" });
     }
   });
 
@@ -394,7 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Order routes
+  // Order routes - Secured with JWT authentication
   app.post("/api/orders", async (req, res) => {
     try {
       const token = req.headers.authorization?.replace('Bearer ', '');
@@ -402,13 +469,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      const userId = Buffer.from(token, 'base64').toString();
-      const orderData = insertOrderSchema.parse({ ...req.body, userId });
+      // Verify JWT token
+      const tokenData = verifySecureToken(token);
+      if (!tokenData) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      // Verify user exists
+      const user = await storage.getUser(tokenData.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify email matches token
+      if (user.email !== tokenData.email) {
+        return res.status(401).json({ error: "Token email mismatch" });
+      }
+
+      const orderData = insertOrderSchema.parse({ ...req.body, userId: tokenData.userId });
       
       const order = await storage.createOrder(orderData);
       res.json(order);
     } catch (error) {
       res.status(400).json({ error: "Invalid order data" });
+    }
+  });
+
+  // Payment routes - Secured with JWT authentication
+  app.post("/api/payments", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { sourceId, verificationToken, currency = "USD", orderId } = z.object({
+        sourceId: z.string(),
+        verificationToken: z.string().optional(),
+        currency: z.string().default("USD"),
+        orderId: z.string()
+      }).parse(req.body);
+
+      // Verify JWT token
+      const tokenData = verifySecureToken(token);
+      if (!tokenData) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      // Verify user exists
+      const user = await storage.getUser(tokenData.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify email matches token
+      if (user.email !== tokenData.email) {
+        return res.status(401).json({ error: "Token email mismatch" });
+      }
+      
+      // Verify the order exists and belongs to the authenticated user
+      const order = await storage.getOrder(orderId);
+      if (!order || order.userId !== tokenData.userId) {
+        return res.status(404).json({ error: "Order not found or access denied" });
+      }
+
+      // Check if order is already paid
+      if (order.paymentStatus === "completed") {
+        return res.status(400).json({ error: "Order already paid" });
+      }
+
+      // Initialize Square client - require proper environment variables
+      const accessToken = process.env.SQUARE_ACCESS_TOKEN;
+      const locationId = process.env.SQUARE_LOCATION_ID;
+      
+      if (!accessToken) {
+        return res.status(500).json({ error: "Square access token not configured" });
+      }
+      
+      if (!locationId) {
+        return res.status(500).json({ error: "Square location ID not configured" });
+      }
+      
+      const squareClient = new SquareClient({
+        accessToken,
+        environment: process.env.NODE_ENV === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox
+      });
+
+      const paymentsApi = squareClient.payments;
+
+      // Update order status to processing
+      await storage.updateOrderPaymentStatus(orderId, "processing");
+
+      try {
+        // SECURITY: Use server-side order total instead of client-supplied amount
+        const orderTotal = parseFloat(order.total.toString());
+        const amountInCents = Math.round(orderTotal * 100);
+        
+        // Create payment request
+        const paymentRequest: any = {
+          sourceId,
+          idempotencyKey: randomUUID(),
+          amountMoney: {
+            amount: BigInt(amountInCents), // Use server-computed amount in cents
+            currency
+          },
+          autocomplete: true,
+          locationId,
+          referenceId: orderId,
+          note: `Payment for order ${orderId} - Total: $${orderTotal.toFixed(2)}`
+        };
+
+        // Add verification token for 3DS if provided
+        if (verificationToken) {
+          paymentRequest.verificationToken = verificationToken;
+        }
+
+        // Process payment with Square
+        const response = await paymentsApi.createPayment(paymentRequest);
+
+        if (response.result.payment) {
+          const payment = response.result.payment;
+          
+          // Determine payment method from source type
+          let paymentMethod = "card";
+          if (sourceId.startsWith('cnon:apple-pay')) {
+            paymentMethod = "apple_pay";
+          } else if (sourceId.startsWith('cnon:google-pay')) {
+            paymentMethod = "google_pay";
+          }
+
+          // Update order with successful payment
+          const updatedOrder = await storage.updateOrderPaymentStatus(
+            orderId, 
+            "completed", 
+            payment.id,
+            paymentMethod
+          );
+
+          res.json({
+            success: true,
+            payment: {
+              id: payment.id,
+              status: payment.status,
+              totalMoney: payment.totalMoney,
+              createdAt: payment.createdAt
+            },
+            order: updatedOrder
+          });
+        } else {
+          // Payment failed
+          await storage.updateOrderPaymentStatus(orderId, "failed");
+          res.status(400).json({ 
+            error: "Payment failed", 
+            details: response.result.errors || [] 
+          });
+        }
+      } catch (squareError: any) {
+        // Handle Square API errors
+        console.error('Square payment error:', squareError);
+        
+        await storage.updateOrderPaymentStatus(orderId, "failed");
+        
+        // Check for specific Square error types
+        if (squareError.errors) {
+          const errorCode = squareError.errors[0]?.code;
+          const errorDetail = squareError.errors[0]?.detail;
+          
+          // Handle 3DS verification required
+          if (errorCode === 'VERIFY_CVV' || errorCode === 'VERIFY_AVS') {
+            return res.status(400).json({
+              error: "Card verification required",
+              code: errorCode,
+              details: errorDetail,
+              requiresVerification: true
+            });
+          }
+          
+          // Handle declined cards
+          if (errorCode === 'CARD_DECLINED' || errorCode === 'CVV_FAILURE') {
+            return res.status(400).json({
+              error: "Card declined",
+              code: errorCode,
+              details: errorDetail
+            });
+          }
+          
+          // Handle insufficient funds
+          if (errorCode === 'INSUFFICIENT_FUNDS') {
+            return res.status(400).json({
+              error: "Insufficient funds",
+              code: errorCode,
+              details: errorDetail
+            });
+          }
+        }
+        
+        res.status(500).json({ 
+          error: "Payment processing failed", 
+          details: squareError.message 
+        });
+      }
+    } catch (error) {
+      console.error('Payment endpoint error:', error);
+      res.status(400).json({ error: "Invalid payment data" });
     }
   });
 
