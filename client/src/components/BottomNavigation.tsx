@@ -7,13 +7,17 @@ import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import PaymentForm from "./PaymentForm";
-import { Loader2, CheckCircle } from "lucide-react";
+import DeliveryOptions from "./DeliveryOptions";
+import { Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 
 export default function BottomNavigation() {
   const { items, total, itemCount, clearCart } = useCart();
   const { token } = useAuth();
   const { toast } = useToast();
   const [location] = useLocation();
+  const [showCheckoutFlow, setShowCheckoutFlow] = useState(false);
+  const [showDeliveryOptions, setShowDeliveryOptions] = useState(false);
+  const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState("pickup");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<any>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -37,7 +41,14 @@ export default function BottomNavigation() {
     },
     onSuccess: (order) => {
       setCurrentOrder(order);
-      setShowPaymentForm(true);
+      
+      // Handle different delivery methods
+      if (selectedDeliveryMethod === "pickup") {
+        setShowPaymentForm(true);
+      } else {
+        // For external platforms, redirect to their ordering page
+        handleExternalPlatformRedirect(order);
+      }
     },
     onError: () => {
       toast({
@@ -48,9 +59,15 @@ export default function BottomNavigation() {
     }
   });
 
-  const handleCheckout = () => {
+  // Start checkout flow by showing delivery options
+  const handleStartCheckout = () => {
     if (items.length === 0) return;
+    setShowCheckoutFlow(true);
+    setShowDeliveryOptions(true);
+  };
 
+  // Continue with order creation after delivery method is selected
+  const handleProceedToOrder = () => {
     createOrderMutation.mutate({
       items: items.map(item => ({
         id: item.id,
@@ -61,8 +78,54 @@ export default function BottomNavigation() {
       total: total.toFixed(2),
       paymentAmount: total.toFixed(2),
       status: 'pending',
-      paymentStatus: 'pending'
+      paymentStatus: 'pending',
+      deliveryMethod: selectedDeliveryMethod,
+      deliveryData: selectedDeliveryMethod !== "pickup" ? {
+        platform: selectedDeliveryMethod,
+        items: items.map(item => ({
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        })),
+        total: total.toFixed(2)
+      } : null
     });
+  };
+
+  // Handle redirect to external platforms
+  const handleExternalPlatformRedirect = (order: any) => {
+    const platformUrls = {
+      grubhub: "https://www.grubhub.com/",
+      doordash: "https://www.doordash.com/"
+    };
+
+    // Create a URL with order context (in real implementation, you'd have specific restaurant URLs)
+    const platformUrl = platformUrls[selectedDeliveryMethod as keyof typeof platformUrls];
+    
+    if (platformUrl) {
+      // Store order data for potential reordering
+      localStorage.setItem('pendingExternalOrder', JSON.stringify({
+        orderId: order.id,
+        items: items,
+        total: total,
+        platform: selectedDeliveryMethod,
+        timestamp: new Date().toISOString()
+      }));
+
+      toast({
+        title: `Redirecting to ${selectedDeliveryMethod === "grubhub" ? "Grubhub" : "DoorDash"}`,
+        description: "Your order details have been saved. Complete your order on their platform.",
+        duration: 3000,
+      });
+
+      // Close modals and clear cart
+      setTimeout(() => {
+        setShowCheckoutFlow(false);
+        setShowDeliveryOptions(false);
+        clearCart();
+        window.open(platformUrl, '_blank');
+      }, 1000);
+    }
   };
 
   const handlePaymentSuccess = (payment: any) => {
@@ -102,6 +165,15 @@ export default function BottomNavigation() {
     });
   };
 
+  // Handle closing the checkout flow
+  const handleCloseCheckout = () => {
+    setShowCheckoutFlow(false);
+    setShowDeliveryOptions(false);
+    setShowPaymentForm(false);
+    setCurrentOrder(null);
+    setPaymentSuccess(false);
+  };
+
   return (
     <>
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
@@ -127,7 +199,7 @@ export default function BottomNavigation() {
             
             <Button 
               className="w-full py-4 rounded-xl font-heading font-semibold text-lg"
-              onClick={handleCheckout}
+              onClick={handleStartCheckout}
               disabled={createOrderMutation.isPending}
               data-testid="button-checkout"
             >
@@ -137,7 +209,7 @@ export default function BottomNavigation() {
                   Creating Order...
                 </>
               ) : (
-                "Proceed to Checkout"
+                "Choose Delivery & Checkout"
               )}
             </Button>
           </div>
@@ -174,6 +246,48 @@ export default function BottomNavigation() {
           </Link>
         </div>
       </div>
+
+      {/* Delivery Options Modal */}
+      <Dialog open={showDeliveryOptions} onOpenChange={handleCloseCheckout}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose Your Delivery Method</DialogTitle>
+          </DialogHeader>
+          
+          <DeliveryOptions
+            selectedMethod={selectedDeliveryMethod}
+            onMethodChange={setSelectedDeliveryMethod}
+            className="border-0 shadow-none"
+          />
+          
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={handleCloseCheckout}
+              className="flex-1"
+              data-testid="button-cancel-delivery"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Cart
+            </Button>
+            <Button
+              onClick={handleProceedToOrder}
+              disabled={createOrderMutation.isPending}
+              className="flex-1"
+              data-testid="button-proceed-order"
+            >
+              {createOrderMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                selectedDeliveryMethod === "pickup" ? "Proceed to Payment" : `Order via ${selectedDeliveryMethod === "grubhub" ? "Grubhub" : "DoorDash"}`
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Modal */}
       <Dialog open={showPaymentForm} onOpenChange={setShowPaymentForm}>

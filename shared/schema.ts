@@ -54,6 +54,8 @@ export const orders = pgTable("orders", {
   paymentMethod: text("payment_method"), // card, apple_pay, google_pay
   paymentAmount: decimal("payment_amount", { precision: 10, scale: 2 }),
   paymentCurrency: text("payment_currency").default("USD"),
+  deliveryMethod: text("delivery_method").default("pickup"), // pickup, grubhub, doordash
+  deliveryData: jsonb("delivery_data"), // Store platform-specific data like redirect URLs, order IDs
   createdAt: timestamp("created_at").defaultNow(),
 });
 
