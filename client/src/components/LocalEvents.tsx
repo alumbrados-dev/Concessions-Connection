@@ -39,20 +39,32 @@ export default function LocalEvents({ events, ads }: LocalEventsProps) {
               >
                 {event.eventName}
               </h3>
-              <p 
-                className="text-sm opacity-90" 
-                data-testid={`text-event-location-${event.id}`}
-              >
-                {event.location}
-              </p>
+              {event.location && (
+                <p 
+                  className="text-sm opacity-90" 
+                  data-testid={`text-event-location-${event.id}`}
+                >
+                  {event.location}
+                </p>
+              )}
               <p 
                 className="text-xs opacity-75" 
                 data-testid={`text-event-time-${event.id}`}
               >
-                {new Date(event.dateTime).toLocaleDateString()} at {new Date(event.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(event.dateTime).toLocaleDateString()}
               </p>
+              {event.description && (
+                <p 
+                  className="text-xs opacity-75 mt-1" 
+                  data-testid={`text-event-description-${event.id}`}
+                >
+                  {event.description}
+                </p>
+              )}
             </div>
-            <i className="fas fa-calendar-alt text-2xl opacity-75"></i>
+            <div className="text-2xl opacity-75">
+              📅
+            </div>
           </div>
         </div>
       ))}
@@ -81,7 +93,7 @@ export default function LocalEvents({ events, ads }: LocalEventsProps) {
                   className="text-sm text-muted-foreground" 
                   data-testid={`text-ad-description-${ad.id}`}
                 >
-                  {ad.description || `${ad.location}`}
+                  {ad.description || `Located in ${ad.location || 'your area'}`}
                 </p>
               </div>
               {ad.link && (
