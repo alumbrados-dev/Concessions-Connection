@@ -1,9 +1,28 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY || "default_key"
-});
+// Helper function to validate API key availability
+function getValidatedApiKey(): string | null {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+  
+  // Return null if no key provided or if it's empty/whitespace
+  if (!apiKey || apiKey.trim() === '' || apiKey === 'default_key') {
+    return null;
+  }
+  
+  return apiKey.trim();
+}
+
+// Only initialize OpenAI if we have a valid API key
+let openai: OpenAI | null = null;
+const validApiKey = getValidatedApiKey();
+if (validApiKey) {
+  try {
+    openai = new OpenAI({ apiKey: validApiKey });
+  } catch (error) {
+    console.error('Failed to initialize OpenAI client:', error);
+    openai = null;
+  }
+}
 
 export interface AIHostessContext {
   currentItem?: string;
@@ -11,10 +30,20 @@ export interface AIHostessContext {
   menuItems?: Array<{ name: string; price: string; category: string }>;
 }
 
+// Check if AI is properly configured
+export function isAIConfigured(): boolean {
+  return openai !== null && getValidatedApiKey() !== null;
+}
+
 export async function generateHostessResponse(
   userMessage: string,
   context: AIHostessContext = {}
 ): Promise<{ message: string; suggestedActions: string[] }> {
+  // CRITICAL FIX: Validate OpenAI is properly configured before making API calls
+  if (!isAIConfigured()) {
+    throw new Error('AI service is not properly configured - missing or invalid API key');
+  }
+  
   try {
     const systemPrompt = `You are a friendly AI hostess for Concessions Connection (also known as Mr Food Truck), a family-run mobile food truck. Your role is to:
 1. Welcome customers warmly
@@ -41,7 +70,7 @@ Respond with JSON in this format: { "message": "your response", "suggestedAction
 
 Available actions: "add_combo", "view_specials", "checkout", "add_item", "view_category"`;
 
-    const response = await openai.chat.completions.create({
+    const response = await openai!.chat.completions.create({
       model: "gpt-5",
       messages: [
         { role: "system", content: systemPrompt },

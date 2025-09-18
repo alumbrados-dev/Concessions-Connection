@@ -308,7 +308,7 @@ export default function Header({
               </div>
             </SheetContent>
           </Sheet>
-        </div>
+        </nav>
       </div>
 
       {/* Points Settings Modal */}

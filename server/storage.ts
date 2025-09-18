@@ -86,6 +86,10 @@ export interface IStorage {
   // Click tracking operations
   trackAdClick(click: InsertAdClick): Promise<AdClick>;
   trackEventClick(click: InsertEventClick): Promise<EventClick>;
+  
+  // Validation operations
+  validateAdExists(adId: string): Promise<boolean>;
+  validateEventExists(eventId: string): Promise<boolean>;
   getAdClickCount(adId: string): Promise<number>;
   getEventClickCount(eventId: string): Promise<number>;
   getAdClicksByDateRange(adId: string, startDate: Date, endDate: Date): Promise<AdClick[]>;
@@ -1972,6 +1976,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Click tracking operations
+  async validateAdExists(adId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return true; // Assume valid in fallback mode
+    }
+    
+    try {
+      const result = await db.select({ id: ads.id })
+        .from(ads)
+        .where(eq(ads.id, adId))
+        .limit(1);
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error validating ad existence:', error);
+      return false;
+    }
+  }
+
+  async validateEventExists(eventId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return true; // Assume valid in fallback mode
+    }
+    
+    try {
+      const result = await db.select({ id: localEvents.id })
+        .from(localEvents)
+        .where(eq(localEvents.id, eventId))
+        .limit(1);
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error validating event existence:', error);
+      return false;
+    }
+  }
+
   async trackAdClick(click: InsertAdClick): Promise<AdClick> {
     await this.ensureInitialized();
     
@@ -1985,18 +2027,9 @@ export class DatabaseStorage implements IStorage {
       return clickData;
     }
     
-    try {
-      const result = await db.insert(adClicks).values(click).returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error tracking ad click:', error);
-      const clickData: AdClick = {
-        id: randomUUID(),
-        ...click,
-        clickedAt: new Date()
-      };
-      return clickData;
-    }
+    // Database operation - let errors bubble up for proper handling
+    const result = await db.insert(adClicks).values(click).returning();
+    return result[0];
   }
 
   async trackEventClick(click: InsertEventClick): Promise<EventClick> {
@@ -2012,18 +2045,9 @@ export class DatabaseStorage implements IStorage {
       return clickData;
     }
     
-    try {
-      const result = await db.insert(eventClicks).values(click).returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error tracking event click:', error);
-      const clickData: EventClick = {
-        id: randomUUID(),
-        ...click,
-        clickedAt: new Date()
-      };
-      return clickData;
-    }
+    // Database operation - let errors bubble up for proper handling
+    const result = await db.insert(eventClicks).values(click).returning();
+    return result[0];
   }
 
   async getAdClickCount(adId: string): Promise<number> {

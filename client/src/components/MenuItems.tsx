@@ -326,6 +326,6 @@ export default function MenuItems({ items }: MenuItemsProps) {
           </section>
         );
       })}
-    </div>
+    </main>
   );
 }

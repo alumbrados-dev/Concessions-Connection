@@ -736,26 +736,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user agent from request if not provided  
       const clientUserAgent = userAgent || req.headers['user-agent'];
 
+      // CRITICAL FIX: Validate content exists before tracking click
       if (type === "ad") {
-        const click = await storage.trackAdClick({
-          adId: contentId,
-          userId: userId || null,
-          ipAddress: clientIp || null,
-          userAgent: clientUserAgent || null
-        });
-        res.json({ success: true, clickId: click.id });
+        // Check if ad exists in database
+        const adExists = await storage.validateAdExists(contentId);
+        if (!adExists) {
+          return res.status(400).json({ 
+            error: "Invalid ad ID", 
+            message: "The specified ad does not exist"
+          });
+        }
+
+        try {
+          const click = await storage.trackAdClick({
+            adId: contentId,
+            userId: userId || null,
+            ipAddress: clientIp || null,
+            userAgent: clientUserAgent || null
+          });
+          res.json({ success: true, clickId: click.id });
+        } catch (dbError) {
+          console.error('Database error tracking ad click:', dbError);
+          res.status(500).json({ 
+            error: "Database error", 
+            message: "Failed to record click due to database error"
+          });
+        }
       } else {
-        const click = await storage.trackEventClick({
-          eventId: contentId,
-          userId: userId || null,
-          ipAddress: clientIp || null,
-          userAgent: clientUserAgent || null
-        });
-        res.json({ success: true, clickId: click.id });
+        // Check if event exists in database
+        const eventExists = await storage.validateEventExists(contentId);
+        if (!eventExists) {
+          return res.status(400).json({ 
+            error: "Invalid event ID", 
+            message: "The specified event does not exist"
+          });
+        }
+
+        try {
+          const click = await storage.trackEventClick({
+            eventId: contentId,
+            userId: userId || null,
+            ipAddress: clientIp || null,
+            userAgent: clientUserAgent || null
+          });
+          res.json({ success: true, clickId: click.id });
+        } catch (dbError) {
+          console.error('Database error tracking event click:', dbError);
+          res.status(500).json({ 
+            error: "Database error", 
+            message: "Failed to record click due to database error"
+          });
+        }
       }
     } catch (error) {
-      console.error('Error tracking click:', error);
-      res.status(400).json({ error: "Invalid click tracking data" });
+      console.error('Error processing click tracking request:', error);
+      // If it's a validation error, return 400
+      if (error.name === 'ZodError') {
+        res.status(400).json({ 
+          error: "Invalid request data", 
+          message: "Please check your request parameters"
+        });
+      } else {
+        // Other errors are server errors
+        res.status(500).json({ 
+          error: "Server error", 
+          message: "Failed to process click tracking request"
+        });
+      }
     }
   });
 
@@ -1396,11 +1443,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Hostess route - integrates with OpenAI for AI hostess responses
   app.post("/api/ai/chat", async (req, res) => {
     try {
-      // Check if AI is enabled before processing
+      // CRITICAL FIX: Check if AI is enabled before processing
       const aiEnabledSetting = await storage.getSetting('ai-enabled');
       const isAIEnabled = aiEnabledSetting?.value === 'true';
       
       if (!isAIEnabled) {
+        return res.status(503).json({ 
+          error: "AI functionality is currently disabled",
+          message: "AI voice assistant is not available at this time. Please contact an administrator.",
+          suggestedActions: []
+        });
+      }
+
+      // CRITICAL FIX: Check if OpenAI is properly configured before processing
+      const { isAIConfigured } = await import('./lib/openai');
+      if (!isAIConfigured()) {
+        console.log('AI endpoint called but OpenAI API key is missing or invalid');
         return res.status(503).json({ 
           error: "AI functionality is currently disabled",
           message: "AI voice assistant is not available at this time. Please contact an administrator.",
@@ -1424,7 +1482,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(response);
     } catch (error) {
       console.error('AI chat error:', error);
-      res.status(500).json({ 
+      
+      // Check if it's an AI configuration error
+      if (error.message && error.message.includes('not properly configured')) {
+        return res.status(503).json({ 
+          error: "AI functionality is currently disabled",
+          message: "AI voice assistant is not available at this time. Please contact an administrator.",
+          suggestedActions: []
+        });
+      }
+      
+      // For other errors, return generic error
+      res.status(503).json({ 
         error: "AI service unavailable",
         message: "I'm having trouble right now. Please try again later!",
         suggestedActions: []
