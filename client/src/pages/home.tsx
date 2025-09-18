@@ -44,6 +44,12 @@ export default function Home() {
     queryKey: ["/api/ads"],
   });
 
+  // Fetch truck location for Hours & Location section
+  const { data: truckLocation } = useQuery({
+    queryKey: ['/api/truck-location'],
+    refetchInterval: 30000, // Refresh every 30 seconds
+  }) as { data: any };
+
   useEffect(() => {
     const unsubscribeStock = realtimeConnection.subscribe('STOCK_UPDATED', (data) => {
       const item = data.data as Item;
@@ -218,13 +224,79 @@ export default function Home() {
             
             <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
               <h3 className="font-heading text-xl font-semibold mb-4">Hours & Location</h3>
-              <div className="space-y-3">
-                <p className="text-lg font-medium">Tuesday - Sunday, 11 AM - 8 PM</p>
-                <p className="text-sm text-muted-foreground">Closed Mondays</p>
-                <p className="text-sm text-muted-foreground mt-4">
-                  Catch our truck as we tour local events, neighborhoods, and community celebrations. 
-                  Follow us on social media for our schedule and specials!
-                </p>
+              <div className="space-y-4">
+                {/* Operating Hours */}
+                <div>
+                  <p className="text-lg font-medium">Tuesday - Sunday, 11 AM - 8 PM</p>
+                  <p className="text-sm text-muted-foreground">Closed Mondays</p>
+                </div>
+                
+                {/* Current Location Status */}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold mb-2 flex items-center" data-testid="text-location-status">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${truckLocation?.gpsEnabled ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    Current Location
+                  </h4>
+                  {truckLocation?.gpsEnabled ? (
+                    <div className="space-y-2">
+                      {truckLocation.address ? (
+                        <p className="text-sm font-medium" data-testid="text-current-address">
+                          📍 {truckLocation.address}
+                        </p>
+                      ) : (
+                        truckLocation.latitude && truckLocation.longitude ? (
+                          <p className="text-sm font-medium" data-testid="text-current-coordinates">
+                            📍 {truckLocation.latitude.toFixed(4)}, {truckLocation.longitude.toFixed(4)}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            GPS enabled, locating truck...
+                          </p>
+                        )
+                      )}
+                      {truckLocation.serviceRadius && (
+                        <p className="text-xs text-muted-foreground">
+                          Service radius: {truckLocation.serviceRadius} miles
+                        </p>
+                      )}
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          🚚 Currently Open
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        📍 Location sharing is currently disabled
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Check our social media for today's location and specials!
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Find Us */}
+                <div className="border-t pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Catch our truck as we tour local events, neighborhoods, and community celebrations.
+                  </p>
+                  {truckLocation?.gpsEnabled && truckLocation.latitude && truckLocation.longitude && (
+                    <div className="mt-3">
+                      <button 
+                        className="text-sm text-primary hover:underline font-medium"
+                        onClick={() => {
+                          const url = `https://www.google.com/maps?q=${truckLocation.latitude},${truckLocation.longitude}`;
+                          window.open(url, '_blank');
+                        }}
+                        data-testid="button-view-map"
+                      >
+                        📍 View on Google Maps
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
