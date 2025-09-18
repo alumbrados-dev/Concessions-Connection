@@ -1647,10 +1647,477 @@ function EventsAdsTab() {
 }
 
 function ThemeEditorTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeSection, setActiveSection] = useState<'colors' | 'images' | 'typography'>('colors');
+  const [colorSettings, setColorSettings] = useState({
+    primaryColor: "#3B82F6",
+    secondaryColor: "#10B981",
+    accentColor: "#F59E0B",
+    backgroundColor: "#FFFFFF",
+    textColor: "#1F2937"
+  });
+  const [typographySettings, setTypographySettings] = useState({
+    fontFamily: "Inter",
+    headingSize: "large",
+    bodySize: "medium"
+  });
+  const [imageGallery, setImageGallery] = useState<any[]>([]);
+
+  // Fetch current theme settings
+  const { data: themeSettings, isLoading, error } = useQuery({
+    queryKey: ['/api/admin/settings', 'theme'],
+    queryFn: () => apiRequest('/api/admin/settings')
+  }) as { data: any, isLoading: boolean, error: any };
+
+  // Update theme settings mutation
+  const updateThemeMutation = useMutation({
+    mutationFn: (themeData: any) => apiRequest('/api/admin/settings', {
+      method: 'POST',
+      body: JSON.stringify({
+        key: 'theme',
+        value: JSON.stringify(themeData)
+      })
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({
+        title: "Theme Updated",
+        description: "Theme settings have been saved successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update theme settings. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Apply theme settings
+  const handleApplyTheme = () => {
+    const themeData = {
+      colors: colorSettings,
+      typography: typographySettings,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Apply to CSS variables immediately for preview
+    const root = document.documentElement;
+    root.style.setProperty('--primary', colorSettings.primaryColor);
+    root.style.setProperty('--secondary', colorSettings.secondaryColor);
+    root.style.setProperty('--accent', colorSettings.accentColor);
+    root.style.setProperty('--background', colorSettings.backgroundColor);
+    root.style.setProperty('--foreground', colorSettings.textColor);
+
+    updateThemeMutation.mutate(themeData);
+  };
+
+  // Reset to default theme
+  const handleResetTheme = () => {
+    const defaultColors = {
+      primaryColor: "#3B82F6",
+      secondaryColor: "#10B981", 
+      accentColor: "#F59E0B",
+      backgroundColor: "#FFFFFF",
+      textColor: "#1F2937"
+    };
+    const defaultTypography = {
+      fontFamily: "Inter",
+      headingSize: "large",
+      bodySize: "medium"
+    };
+
+    setColorSettings(defaultColors);
+    setTypographySettings(defaultTypography);
+
+    // Reset CSS variables
+    const root = document.documentElement;
+    root.style.removeProperty('--primary');
+    root.style.removeProperty('--secondary');
+    root.style.removeProperty('--accent');
+    root.style.removeProperty('--background');
+    root.style.removeProperty('--foreground');
+
+    toast({
+      title: "Theme Reset",
+      description: "Theme has been reset to default settings.",
+    });
+  };
+
+  // Color picker component
+  const ColorPicker = ({ label, value, onChange, testId }: { 
+    label: string, 
+    value: string, 
+    onChange: (color: string) => void,
+    testId: string
+  }) => (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="flex items-center space-x-3">
+        <div 
+          className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer"
+          style={{ backgroundColor: value }}
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'color';
+            input.value = value;
+            input.onchange = (e) => onChange((e.target as HTMLInputElement).value);
+            input.click();
+          }}
+          data-testid={`color-picker-${testId}`}
+        />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-24 font-mono text-xs"
+          data-testid={`input-color-${testId}`}
+        />
+        <div 
+          className="px-3 py-1 rounded text-xs font-medium"
+          style={{ 
+            backgroundColor: value, 
+            color: value === '#FFFFFF' ? '#000000' : '#FFFFFF'
+          }}
+        >
+          Preview
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading theme settings...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <span className="text-destructive font-medium">Failed to load theme settings</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please check your connection and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Theme Editor</h2>
-      <p className="text-muted-foreground">Color themes and visual customization will be implemented here.</p>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Theme Editor</h2>
+          <p className="text-muted-foreground">Customize your food truck app's appearance and branding</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={handleResetTheme}
+            data-testid="button-reset-theme"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
+          <Button
+            onClick={handleApplyTheme}
+            disabled={updateThemeMutation.isPending}
+            data-testid="button-apply-theme"
+          >
+            {updateThemeMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Applying...
+              </>
+            ) : (
+              <>
+                <Palette className="w-4 h-4 mr-2" />
+                Apply Theme
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Section Tabs */}
+      <div className="flex items-center space-x-2">
+        <Button
+          variant={activeSection === 'colors' ? 'default' : 'outline'}
+          onClick={() => setActiveSection('colors')}
+          data-testid="button-switch-colors"
+        >
+          <Palette className="w-4 h-4 mr-2" />
+          Colors
+        </Button>
+        <Button
+          variant={activeSection === 'images' ? 'default' : 'outline'}
+          onClick={() => setActiveSection('images')}
+          data-testid="button-switch-images"
+        >
+          <ImageIcon className="w-4 h-4 mr-2" />
+          Images
+        </Button>
+        <Button
+          variant={activeSection === 'typography' ? 'default' : 'outline'}
+          onClick={() => setActiveSection('typography')}
+          data-testid="button-switch-typography"
+        >
+          <Type className="w-4 h-4 mr-2" />
+          Typography
+        </Button>
+      </div>
+
+      {/* Colors Section */}
+      {activeSection === 'colors' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Color Scheme</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Customize the color palette for your food truck app
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <ColorPicker
+                    label="Primary Color"
+                    value={colorSettings.primaryColor}
+                    onChange={(color) => setColorSettings(prev => ({ ...prev, primaryColor: color }))}
+                    testId="primary"
+                  />
+                  <ColorPicker
+                    label="Secondary Color"
+                    value={colorSettings.secondaryColor}
+                    onChange={(color) => setColorSettings(prev => ({ ...prev, secondaryColor: color }))}
+                    testId="secondary"
+                  />
+                  <ColorPicker
+                    label="Accent Color"
+                    value={colorSettings.accentColor}
+                    onChange={(color) => setColorSettings(prev => ({ ...prev, accentColor: color }))}
+                    testId="accent"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <ColorPicker
+                    label="Background Color"
+                    value={colorSettings.backgroundColor}
+                    onChange={(color) => setColorSettings(prev => ({ ...prev, backgroundColor: color }))}
+                    testId="background"
+                  />
+                  <ColorPicker
+                    label="Text Color"
+                    value={colorSettings.textColor}
+                    onChange={(color) => setColorSettings(prev => ({ ...prev, textColor: color }))}
+                    testId="text"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Color Preview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div 
+                className="p-6 rounded-lg border-2"
+                style={{ 
+                  backgroundColor: colorSettings.backgroundColor,
+                  color: colorSettings.textColor,
+                  borderColor: colorSettings.primaryColor
+                }}
+              >
+                <h3 className="text-xl font-bold mb-2" style={{ color: colorSettings.primaryColor }}>
+                  Concessions Connection
+                </h3>
+                <p className="mb-4">Your mobile food truck experience</p>
+                <div className="flex space-x-2">
+                  <div 
+                    className="px-4 py-2 rounded text-white"
+                    style={{ backgroundColor: colorSettings.primaryColor }}
+                  >
+                    Primary Button
+                  </div>
+                  <div 
+                    className="px-4 py-2 rounded text-white"
+                    style={{ backgroundColor: colorSettings.secondaryColor }}
+                  >
+                    Secondary
+                  </div>
+                  <div 
+                    className="px-4 py-2 rounded text-white"
+                    style={{ backgroundColor: colorSettings.accentColor }}
+                  >
+                    Accent
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Images Section */}
+      {activeSection === 'images' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Image Gallery</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Manage logos, banners, and other brand images
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <ImageIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Upload Brand Images</h3>
+                <p className="text-muted-foreground mb-4">
+                  Add your logo, food photos, and promotional images
+                </p>
+                <Button variant="outline" data-testid="button-upload-image">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Images
+                </Button>
+              </div>
+              <div className="mt-6 grid grid-cols-3 gap-4">
+                {imageGallery.map((image, index) => (
+                  <div key={index} className="relative group">
+                    <img 
+                      src={image.url} 
+                      alt={image.name}
+                      className="w-full h-24 object-cover rounded border"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                      <Button size="sm" variant="secondary">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Typography Section */}
+      {activeSection === 'typography' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Typography Settings</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Customize fonts and text sizes throughout the app
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <Label className="text-sm font-medium">Font Family</Label>
+                  <Select 
+                    value={typographySettings.fontFamily}
+                    onValueChange={(value) => setTypographySettings(prev => ({ ...prev, fontFamily: value }))}
+                  >
+                    <SelectTrigger data-testid="select-font-family">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Inter">Inter</SelectItem>
+                      <SelectItem value="Roboto">Roboto</SelectItem>
+                      <SelectItem value="Open Sans">Open Sans</SelectItem>
+                      <SelectItem value="Lato">Lato</SelectItem>
+                      <SelectItem value="Poppins">Poppins</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Heading Size</Label>
+                  <Select 
+                    value={typographySettings.headingSize}
+                    onValueChange={(value) => setTypographySettings(prev => ({ ...prev, headingSize: value }))}
+                  >
+                    <SelectTrigger data-testid="select-heading-size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="large">Large</SelectItem>
+                      <SelectItem value="extra-large">Extra Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Body Text Size</Label>
+                  <Select 
+                    value={typographySettings.bodySize}
+                    onValueChange={(value) => setTypographySettings(prev => ({ ...prev, bodySize: value }))}
+                  >
+                    <SelectTrigger data-testid="select-body-size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="large">Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Typography Preview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Typography Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div 
+                className="space-y-4"
+                style={{ fontFamily: typographySettings.fontFamily }}
+              >
+                <h1 className={`font-bold ${
+                  typographySettings.headingSize === 'small' ? 'text-lg' :
+                  typographySettings.headingSize === 'medium' ? 'text-xl' :
+                  typographySettings.headingSize === 'large' ? 'text-2xl' : 'text-3xl'
+                }`}>
+                  Main Heading - Concessions Connection
+                </h1>
+                <h2 className={`font-semibold ${
+                  typographySettings.headingSize === 'small' ? 'text-base' :
+                  typographySettings.headingSize === 'medium' ? 'text-lg' :
+                  typographySettings.headingSize === 'large' ? 'text-xl' : 'text-2xl'
+                }`}>
+                  Section Heading - Our Menu
+                </h2>
+                <p className={`${
+                  typographySettings.bodySize === 'small' ? 'text-sm' :
+                  typographySettings.bodySize === 'medium' ? 'text-base' : 'text-lg'
+                }`}>
+                  Body text - Welcome to our mobile food truck experience. We serve delicious, 
+                  fresh food made with local ingredients and a passion for great flavors.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
