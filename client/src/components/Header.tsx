@@ -66,20 +66,8 @@ export default function Header({
           </Button>
         </div>
         
-        {/* Center - App name and location */}
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-            <i className="fas fa-truck text-white text-lg"></i>
-          </div>
-          <div className="text-center">
-            <h1 className="font-heading font-bold text-lg" data-testid="text-app-name">
-              Concessions Connection
-            </h1>
-            <p className="text-xs text-muted-foreground" data-testid="text-location">
-              Annandale, VA
-            </p>
-          </div>
-        </div>
+        {/* Center - Empty space (removed app name and location bubble) */}
+        <div className="flex-1"></div>
         
         {/* Right side - Hamburger menu */}
         <div className="flex items-center">
