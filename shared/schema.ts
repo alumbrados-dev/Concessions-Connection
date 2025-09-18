@@ -52,6 +52,22 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const truckLocation = pgTable("truck_location", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
+  radius: decimal("radius", { precision: 5, scale: 2 }).default('5.00'), // miles for geofencing
+  gpsEnabled: boolean("gps_enabled").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -76,6 +92,16 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   createdAt: true,
 });
 
+export const insertTruckLocationSchema = createInsertSchema(truckLocation).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertSettingsSchema = createInsertSchema(settings).omit({
+  id: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -91,3 +117,9 @@ export type InsertAd = z.infer<typeof insertAdSchema>;
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+export type TruckLocation = typeof truckLocation.$inferSelect;
+export type InsertTruckLocation = z.infer<typeof insertTruckLocationSchema>;
+
+export type Settings = typeof settings.$inferSelect;
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;

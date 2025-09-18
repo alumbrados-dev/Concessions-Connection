@@ -1,5 +1,5 @@
-import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder } from "@shared/schema";
-import { db, users, items, localEvents, ads, orders } from "./lib/db";
+import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings } from "@shared/schema";
+import { db, users, items, localEvents, ads, orders, truckLocation, settings } from "./lib/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -14,19 +14,37 @@ export interface IStorage {
   getItem(id: string): Promise<Item | undefined>;
   createItem(item: InsertItem): Promise<Item>;
   updateItem(id: string, updates: Partial<Item>): Promise<Item | undefined>;
+  deleteItem(id: string): Promise<boolean>;
   updateItemStock(id: string, stock: number): Promise<Item | undefined>;
 
   // Event operations
+  getAllEvents(): Promise<LocalEvent[]>;
   getActiveEvents(): Promise<LocalEvent[]>;
+  getEvent(id: string): Promise<LocalEvent | undefined>;
   createEvent(event: InsertLocalEvent): Promise<LocalEvent>;
+  updateEvent(id: string, updates: Partial<LocalEvent>): Promise<LocalEvent | undefined>;
+  deleteEvent(id: string): Promise<boolean>;
 
   // Ad operations
+  getAllAds(): Promise<Ad[]>;
   getActiveAds(): Promise<Ad[]>;
+  getAd(id: string): Promise<Ad | undefined>;
   createAd(ad: InsertAd): Promise<Ad>;
+  updateAd(id: string, updates: Partial<Ad>): Promise<Ad | undefined>;
+  deleteAd(id: string): Promise<boolean>;
 
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
   getUserOrders(userId: string): Promise<Order[]>;
+
+  // Truck location operations
+  getTruckLocation(): Promise<TruckLocation | undefined>;
+  updateTruckLocation(location: InsertTruckLocation): Promise<TruckLocation>;
+
+  // Settings operations
+  getSetting(key: string): Promise<Settings | undefined>;
+  setSetting(key: string, value: string): Promise<Settings>;
+  getAllSettings(): Promise<Settings[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -595,6 +613,8 @@ export class DatabaseStorage implements IStorage {
       const user: User = {
         ...insertUser,
         id,
+        orderHistory: insertUser.orderHistory || [],
+        preferences: insertUser.preferences || {},
         createdAt: new Date(),
       };
       this.fallbackData.users.set(id, user);
@@ -610,6 +630,8 @@ export class DatabaseStorage implements IStorage {
       const user: User = {
         ...insertUser,
         id,
+        orderHistory: insertUser.orderHistory || [],
+        preferences: insertUser.preferences || {},
         createdAt: new Date(),
       };
       this.fallbackData.users.set(id, user);

@@ -1,0 +1,247 @@
+Build a mobile food truck web app in Replit using React, with a Supabase backend, deployable to Android via Capacitor (iOS later). Focus on a desktop-only admin page and core user-facing features. Ensure a clean, scalable structure.
+
+App Features:
+
+
+
+
+
+Frontend (User-Facing):
+
+
+
+
+
+Login screen with Supabase magic link auth (email-based) to track user emails, accounts, and order preferences.
+
+
+
+Dynamic menu with selector switches (e.g., "1 fry, 2 drinks") linked to real-time inventory from Supabase items table.
+
+
+
+AI Hostess (Voiceplug/Kore.ai SDK): Voice/text greetings ("Welcome to [Truck Name]! Want fries?"), suggests items based on order history, with guardrails to stay menu-focused and redirect off-topic queries.
+
+
+
+Hours & Location Section (below menu):
+
+
+
+
+
+GPS toggle display: Shows "We're open for business!" with truck location (from Supabase truck_location) if admin enables GPS, or "Sorry, we are currently closed!" if off.
+
+
+
+Local events display: Pulls from Supabase local_events table, supports geofencing with admin-set radius (miles) for revenue potential.
+
+
+
+Local ads: Eye-catching, scrolling banners (e.g., "Visit Joe’s BBQ nearby!") from Supabase ads table, location-based, clickable for revenue.
+
+
+
+Images: Embed menu/event/ad images from Supabase Storage using <img src="/image-name.jpg"> (HTML) or src={require('/image-name.jpg')} (React).
+
+
+
+Header: Concessions Connection PNG logo in top-left corner.
+
+
+
+Backend (Supabase):
+
+
+
+
+
+Tables:
+
+
+
+
+
+items (menu/inventory: name, price, stock, image_url).
+
+
+
+local_events (name, date, location, description).
+
+
+
+ads (biz_name, image_url, link, location).
+
+
+
+users (email, order_history, preferences).
+
+
+
+truck_location (lat, lng, radius).
+
+
+
+Real-time updates: Admin changes (e.g., stock, events) sync instantly to app, updating AI hostess dynamically.
+
+
+
+Storage: Upload images (menu, events, ads) to Supabase Storage, served via URLs.
+
+
+
+Monitoring: Dashboard alerts at 80% of 500MB free-tier database limit.
+
+Admin Page (Desktop-Only):
+
+
+
+
+
+Design: Full-window with Manila envelope-style tabs (CSS: background: #f5f5dc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);). Hide on mobile with media query (@media (max-width: 768px) { display: none; }).
+
+
+
+Tabs (use react-tabs, npm i react-tabs):
+
+
+
+
+
+GPS Locator:
+
+
+
+
+
+Toggle switch to enable/disable GPS (powers event/ad targeting).
+
+
+
+Inputs: Truck position (lat/long), radius (miles) for geofencing.
+
+
+
+Map preview (Leaflet.js, free tier).
+
+
+
+Save button: Updates truck_location table in real-time.
+
+
+
+Menu Management:
+
+
+
+
+
+Table view of items (Name | Price | Stock | Image).
+
+
+
+Add item: Button opens popup form (name, price, description, stock, image upload to Supabase).
+
+
+
+Edit: Click item for popup modal with textarea (e.g., "Spicy fries: $4.99 – Extra crispy!").
+
+
+
+Adjust stock: Inline number spinners.
+
+
+
+Events & Ads:
+
+
+
+
+
+Events: Form to add/edit local_events (name, date/time via calendar picker, location, description). Ties to GPS for auto-suggestions.
+
+
+
+Ads: Form for ads (biz name, image upload, link, location filter). Preview as scrolling banners.
+
+
+
+Bulk actions: Delete/archive old events/ads.
+
+
+
+Theme Editor:
+
+
+
+
+
+Color picker for app theme (save to Supabase settings table, apply via CSS: --primary-color: #ff6b35;).
+
+
+
+Text editor: Key-value pairs for global strings (e.g., hostess greeting, menu headers).
+
+
+
+Image upload: Drag-and-drop to Supabase Storage (for menu/events).
+
+
+
+Image gallery: Grid view, click to highlight, drag to reorder (react-dnd), delete button (confirms, removes from storage/table).
+
+Tech/Deployment:
+
+
+
+
+
+Replit: React project (npm i react-tabs react-dnd react-modal @supabase/supabase-js).
+
+
+
+Import Codo AI code: Zip folder (zip -r project.zip .), upload via Replit Files > Import from zip.
+
+
+
+Capacitor: Wrap for Android (npx cap add android). Build in Android Studio for APK. (iOS support later with npx cap add ios.)
+
+
+
+Handoff: Share Supabase credentials to customer.
+
+
+
+Costs: Free tier (Supabase: 500MB database, Replit/Capacitor: free, Voiceplug/Kore.ai: free trials).
+
+Next Steps:
+
+
+
+
+
+Install dependencies: npm i react-modal react-dnd for popups and image drag/delete.
+
+
+
+Implement popups/modals: Use react-modal for edit forms (e.g., menu item details).
+
+
+
+Add image drag/delete: Use react-dnd for reordering in Theme Editor gallery.
+
+
+
+Lock to desktop: Wrap admin component in media query (@media (max-width: 768px) { display: none; }).
+
+
+
+Test in Replit: Run, connect Supabase keys, and tweak. Use navigator.geolocation for live GPS pulls.
+
+
+
+Sync with app: Use Supabase subscriptions (e.g., supabase.channel('items').on('postgres_changes', ...)) for real-time updates to menu, events, ads, feeding AI hostess.
+
+
+
+Generate: Project structure, sample React code for admin page (tabs, Supabase queries), Voiceplug/Kore.ai setup instructions, and Capacitor Android steps. Keep it free-tier, scalable, and customer-ready.
