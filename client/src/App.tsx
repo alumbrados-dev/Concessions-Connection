@@ -11,12 +11,14 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Home from "@/pages/home";
 import About from "@/pages/about";
+import Admin from "@/pages/admin";
 
 function AuthenticatedRoutes() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/about" component={About} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );

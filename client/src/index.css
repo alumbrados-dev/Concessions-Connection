@@ -116,3 +116,105 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Manila Folder-Style Admin Tabs */
+.manila-tabs {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 60px;
+  margin-bottom: -2px;
+  z-index: 10;
+}
+
+.manila-tab {
+  position: relative;
+  height: 50px;
+  padding: 12px 24px 8px;
+  margin-right: -12px;
+  background: linear-gradient(145deg, #f5f1e8 0%, #e8dcc6 100%);
+  border: 2px solid #d4af37;
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: #8b4513;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  transform: perspective(20px) rotateX(-2deg);
+  box-shadow: 
+    0 -2px 4px rgba(212, 175, 55, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  
+  /* Manila folder tab shape */
+  clip-path: polygon(
+    0% 100%,
+    0% 20px,
+    15px 0%,
+    calc(100% - 15px) 0%,
+    100% 20px,
+    100% 100%
+  );
+}
+
+.manila-tab:hover {
+  background: linear-gradient(145deg, #f8f4eb 0%, #ebe0c9 100%);
+  transform: perspective(20px) rotateX(-1deg) translateY(-2px);
+  box-shadow: 
+    0 -4px 8px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.manila-tab[data-state="active"] {
+  background: linear-gradient(145deg, #fef9f0 0%, #f5f0e5 100%);
+  border-color: #cd853f;
+  color: #654321;
+  transform: perspective(20px) rotateX(0deg) translateY(-4px);
+  z-index: 20;
+  box-shadow: 
+    0 -6px 12px rgba(205, 133, 63, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+
+.manila-tab[data-state="active"]::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(145deg, #fef9f0 0%, #f5f0e5 100%);
+  z-index: 21;
+}
+
+/* Manila folder content area */
+.manila-content {
+  position: relative;
+  z-index: 5;
+  background: linear-gradient(135deg, #fef9f0 0%, #f5f0e5 100%);
+  border: 2px solid #cd853f;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dark .manila-tab {
+  background: linear-gradient(145deg, #3a3728 0%, #2d2b20 100%);
+  border-color: #b8860b;
+  color: #daa520;
+}
+
+.dark .manila-tab:hover {
+  background: linear-gradient(145deg, #423e2b 0%, #353225 100%);
+}
+
+.dark .manila-tab[data-state="active"] {
+  background: linear-gradient(145deg, #4a4535 0%, #3d3a2a 100%);
+  border-color: #daa520;
+  color: #f0e68c;
+}
+
+.dark .manila-content {
+  background: linear-gradient(135deg, #2d2b20 0%, #252318 100%);
+  border-color: #b8860b;
+}
