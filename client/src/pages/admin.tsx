@@ -372,10 +372,509 @@ function GPSLocatorTab() {
 }
 
 function MenuManagementTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [itemForm, setItemForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: "",
+    stock: "",
+    imageUrl: "",
+    available: true
+  });
+
+  // Fetch all menu items
+  const { data: menuItems = [], isLoading, error } = useQuery({
+    queryKey: ['/api/items'],
+    queryFn: () => apiRequest('/api/items')
+  }) as { data: any[], isLoading: boolean, error: any };
+
+  // Create item mutation
+  const createItemMutation = useMutation({
+    mutationFn: (itemData: any) => {
+      const token = localStorage.getItem('auth_token');
+      return fetch('/api/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(itemData)
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to create item');
+        return res.json();
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      toast({
+        title: "Item Created",
+        description: "Menu item has been created successfully.",
+      });
+      resetForm();
+      setIsCreateModalOpen(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create menu item. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Update item mutation
+  const updateItemMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => {
+      const token = localStorage.getItem('auth_token');
+      return fetch(`/api/items/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data)
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update item');
+        return res.json();
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      toast({
+        title: "Item Updated",
+        description: "Menu item has been updated successfully.",
+      });
+      resetForm();
+      setEditingItem(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update menu item. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete item mutation
+  const deleteItemMutation = useMutation({
+    mutationFn: (id: string) => {
+      const token = localStorage.getItem('auth_token');
+      return fetch(`/api/items/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to delete item');
+        return res.json();
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      toast({
+        title: "Item Deleted",
+        description: "Menu item has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete menu item. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Update stock mutation
+  const updateStockMutation = useMutation({
+    mutationFn: ({ id, stock }: { id: string, stock: number }) => {
+      const token = localStorage.getItem('auth_token');
+      return fetch(`/api/items/${id}/stock`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ stock })
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update stock');
+        return res.json();
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      toast({
+        title: "Stock Updated",
+        description: "Item stock has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update stock. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const resetForm = () => {
+    setItemForm({
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      stock: "",
+      imageUrl: "",
+      available: true
+    });
+  };
+
+  const handleCreateItem = () => {
+    if (!itemForm.name || !itemForm.price) {
+      toast({
+        title: "Error",
+        description: "Please provide item name and price.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const itemData = {
+      name: itemForm.name,
+      description: itemForm.description || null,
+      price: parseFloat(itemForm.price),
+      category: itemForm.category || null,
+      stock: parseInt(itemForm.stock) || 0,
+      imageUrl: itemForm.imageUrl || null,
+      available: itemForm.available
+    };
+
+    createItemMutation.mutate(itemData);
+  };
+
+  const handleUpdateItem = () => {
+    if (!editingItem || !itemForm.name || !itemForm.price) {
+      toast({
+        title: "Error",
+        description: "Please provide item name and price.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const itemData = {
+      name: itemForm.name,
+      description: itemForm.description || null,
+      price: parseFloat(itemForm.price),
+      category: itemForm.category || null,
+      stock: parseInt(itemForm.stock) || 0,
+      imageUrl: itemForm.imageUrl || null,
+      available: itemForm.available
+    };
+
+    updateItemMutation.mutate({ id: editingItem.id, data: itemData });
+  };
+
+  const handleEditItem = (item: any) => {
+    setEditingItem(item);
+    setItemForm({
+      name: item.name,
+      description: item.description || "",
+      price: item.price.toString(),
+      category: item.category || "",
+      stock: item.stock.toString(),
+      imageUrl: item.imageUrl || "",
+      available: item.available
+    });
+  };
+
+  const handleDeleteItem = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      deleteItemMutation.mutate(id);
+    }
+  };
+
+  const handleStockUpdate = (id: string, newStock: number) => {
+    updateStockMutation.mutate({ id, stock: newStock });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading menu items...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <span className="text-destructive font-medium">Failed to load menu items</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please check your connection and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Menu Management</h2>
-      <p className="text-muted-foreground">Menu items and inventory management will be implemented here.</p>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Menu Management</h2>
+          <p className="text-muted-foreground">Manage your food truck menu items and inventory</p>
+        </div>
+        <Button
+          onClick={() => setIsCreateModalOpen(true)}
+          data-testid="button-create-item"
+        >
+          <Menu className="w-4 h-4 mr-2" />
+          Add Menu Item
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* Statistics */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{(menuItems || []).length}</div>
+            <p className="text-xs text-muted-foreground">Total Items</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{(menuItems || []).filter((item: any) => item.available).length}</div>
+            <p className="text-xs text-muted-foreground">Available</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{(menuItems || []).filter((item: any) => item.stock === 0).length}</div>
+            <p className="text-xs text-muted-foreground">Out of Stock</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{(menuItems || []).filter((item: any) => item.stock < 5).length}</div>
+            <p className="text-xs text-muted-foreground">Low Stock</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Menu Items List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Menu Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(menuItems || []).length === 0 ? (
+            <div className="text-center py-8">
+              <Menu className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No menu items found. Add your first item to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {(menuItems || []).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold">{item.name}</h3>
+                        {item.description && (
+                          <p className="text-sm text-muted-foreground">{item.description}</p>
+                        )}
+                        <div className="flex items-center space-x-4 mt-2">
+                          <span className="text-sm font-medium">${item.price}</span>
+                          {item.category && (
+                            <span className="text-xs bg-secondary px-2 py-1 rounded">{item.category}</span>
+                          )}
+                          <span className={`text-xs px-2 py-1 rounded ${item.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {item.available ? 'Available' : 'Unavailable'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium">Stock: {item.stock}</div>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStockUpdate(item.id, Math.max(0, item.stock - 1))}
+                            disabled={updateStockMutation.isPending}
+                            data-testid={`button-decrease-stock-${item.id}`}
+                          >
+                            -
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStockUpdate(item.id, item.stock + 1)}
+                            disabled={updateStockMutation.isPending}
+                            data-testid={`button-increase-stock-${item.id}`}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 ml-4">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditItem(item)}
+                      data-testid={`button-edit-item-${item.id}`}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteItem(item.id)}
+                      disabled={deleteItemMutation.isPending}
+                      data-testid={`button-delete-item-${item.id}`}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create/Edit Modal */}
+      {(isCreateModalOpen || editingItem) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle>{editingItem ? 'Edit Menu Item' : 'Create Menu Item'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="item-name">Name *</Label>
+                <Input
+                  id="item-name"
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Item name"
+                  data-testid="input-item-name"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="item-description">Description</Label>
+                <Input
+                  id="item-description"
+                  value={itemForm.description}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Item description"
+                  data-testid="input-item-description"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="item-price">Price *</Label>
+                  <Input
+                    id="item-price"
+                    type="number"
+                    step="0.01"
+                    value={itemForm.price}
+                    onChange={(e) => setItemForm(prev => ({ ...prev, price: e.target.value }))}
+                    placeholder="0.00"
+                    data-testid="input-item-price"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="item-stock">Stock</Label>
+                  <Input
+                    id="item-stock"
+                    type="number"
+                    value={itemForm.stock}
+                    onChange={(e) => setItemForm(prev => ({ ...prev, stock: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-item-stock"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="item-category">Category</Label>
+                <Input
+                  id="item-category"
+                  value={itemForm.category}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, category: e.target.value }))}
+                  placeholder="e.g., Main, Sides, Drinks"
+                  data-testid="input-item-category"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="item-image">Image URL</Label>
+                <Input
+                  id="item-image"
+                  value={itemForm.imageUrl}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  placeholder="https://example.com/image.jpg"
+                  data-testid="input-item-image"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="item-available"
+                  checked={itemForm.available}
+                  onCheckedChange={(checked) => setItemForm(prev => ({ ...prev, available: checked }))}
+                  data-testid="switch-item-available"
+                />
+                <Label htmlFor="item-available">Available for sale</Label>
+              </div>
+            </CardContent>
+            <div className="flex justify-end space-x-2 p-6 pt-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setIsCreateModalOpen(false);
+                  setEditingItem(null);
+                }}
+                data-testid="button-cancel-item"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={editingItem ? handleUpdateItem : handleCreateItem}
+                disabled={createItemMutation.isPending || updateItemMutation.isPending}
+                data-testid="button-save-item"
+              >
+                {(createItemMutation.isPending || updateItemMutation.isPending) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {editingItem ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingItem ? 'Update Item' : 'Create Item'
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
