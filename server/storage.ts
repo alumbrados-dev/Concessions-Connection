@@ -56,6 +56,8 @@ export class DatabaseStorage implements IStorage {
     events: new Map<string, LocalEvent>(),
     ads: new Map<string, Ad>(),
     orders: new Map<string, Order>(),
+    truckLocation: null as TruckLocation | null,
+    settings: new Map<string, Settings>(),
   };
 
   constructor() {
@@ -74,6 +76,7 @@ export class DatabaseStorage implements IStorage {
       // Check if data already exists
       const existingItems = await db.select().from(items).limit(1);
       if (existingItems.length > 0) {
+        this.initialized = true;
         return; // Data already initialized
       }
     } catch (error) {
@@ -655,55 +658,522 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getItem(id: string): Promise<Item | undefined> {
-    const result = await db.select().from(items).where(eq(items.id, id)).limit(1);
-    return result[0] || undefined;
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.items.get(id);
+    }
+    
+    try {
+      const result = await db.select().from(items).where(eq(items.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return this.fallbackData.items.get(id);
+    }
   }
 
   async createItem(insertItem: InsertItem): Promise<Item> {
-    const result = await db.insert(items).values(insertItem).returning();
-    return result[0];
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const id = randomUUID();
+      const item: Item = {
+        ...insertItem,
+        id,
+        description: insertItem.description ?? null,
+        imageUrl: insertItem.imageUrl ?? null,
+        stock: insertItem.stock ?? 0,
+        available: insertItem.available ?? true,
+        updatedAt: new Date(),
+      };
+      this.fallbackData.items.set(id, item);
+      return item;
+    }
+    
+    try {
+      const result = await db.insert(items).values(insertItem).returning();
+      return result[0];
+    } catch (error) {
+      const id = randomUUID();
+      const item: Item = {
+        ...insertItem,
+        id,
+        description: insertItem.description ?? null,
+        imageUrl: insertItem.imageUrl ?? null,
+        stock: insertItem.stock ?? 0,
+        available: insertItem.available ?? true,
+        updatedAt: new Date(),
+      };
+      this.fallbackData.items.set(id, item);
+      return item;
+    }
   }
 
   async updateItem(id: string, updates: Partial<Item>): Promise<Item | undefined> {
-    const result = await db.update(items)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(items.id, id))
-      .returning();
-    return result[0] || undefined;
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const existing = this.fallbackData.items.get(id);
+      if (existing) {
+        const updated = { ...existing, ...updates, updatedAt: new Date() };
+        this.fallbackData.items.set(id, updated);
+        return updated;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(items)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(items.id, id))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      const existing = this.fallbackData.items.get(id);
+      if (existing) {
+        const updated = { ...existing, ...updates, updatedAt: new Date() };
+        this.fallbackData.items.set(id, updated);
+        return updated;
+      }
+      return undefined;
+    }
   }
 
   async updateItemStock(id: string, stock: number): Promise<Item | undefined> {
     return this.updateItem(id, { stock });
   }
 
+  async deleteItem(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.items.delete(id);
+    }
+    
+    try {
+      await db.delete(items).where(eq(items.id, id));
+      return true;
+    } catch (error) {
+      return this.fallbackData.items.delete(id);
+    }
+  }
+
   // Event operations
+  async getAllEvents(): Promise<LocalEvent[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.events.values());
+    }
+    
+    try {
+      return await db.select().from(localEvents);
+    } catch (error) {
+      return Array.from(this.fallbackData.events.values());
+    }
+  }
+
   async getActiveEvents(): Promise<LocalEvent[]> {
-    return await db.select().from(localEvents).where(eq(localEvents.active, true));
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.events.values()).filter(event => event.active);
+    }
+    
+    try {
+      return await db.select().from(localEvents).where(eq(localEvents.active, true));
+    } catch (error) {
+      return Array.from(this.fallbackData.events.values()).filter(event => event.active);
+    }
+  }
+
+  async getEvent(id: string): Promise<LocalEvent | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.events.get(id);
+    }
+    
+    try {
+      const result = await db.select().from(localEvents).where(eq(localEvents.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return this.fallbackData.events.get(id);
+    }
   }
 
   async createEvent(insertEvent: InsertLocalEvent): Promise<LocalEvent> {
-    const result = await db.insert(localEvents).values(insertEvent).returning();
-    return result[0];
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const id = randomUUID();
+      const event: LocalEvent = {
+        ...insertEvent,
+        id,
+        imageUrl: insertEvent.imageUrl ?? null,
+        description: insertEvent.description ?? null,
+        active: insertEvent.active ?? true,
+      };
+      this.fallbackData.events.set(id, event);
+      return event;
+    }
+    
+    try {
+      const result = await db.insert(localEvents).values(insertEvent).returning();
+      return result[0];
+    } catch (error) {
+      const id = randomUUID();
+      const event: LocalEvent = {
+        ...insertEvent,
+        id,
+        imageUrl: insertEvent.imageUrl ?? null,
+        description: insertEvent.description ?? null,
+        active: insertEvent.active ?? true,
+      };
+      this.fallbackData.events.set(id, event);
+      return event;
+    }
+  }
+
+  async updateEvent(id: string, updates: Partial<LocalEvent>): Promise<LocalEvent | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const existing = this.fallbackData.events.get(id);
+      if (existing) {
+        const updated = { ...existing, ...updates };
+        this.fallbackData.events.set(id, updated);
+        return updated;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(localEvents)
+        .set(updates)
+        .where(eq(localEvents.id, id))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      const existing = this.fallbackData.events.get(id);
+      if (existing) {
+        const updated = { ...existing, ...updates };
+        this.fallbackData.events.set(id, updated);
+        return updated;
+      }
+      return undefined;
+    }
+  }
+
+  async deleteEvent(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.events.delete(id);
+    }
+    
+    try {
+      await db.delete(localEvents).where(eq(localEvents.id, id));
+      return true;
+    } catch (error) {
+      return this.fallbackData.events.delete(id);
+    }
   }
 
   // Ad operations
+  async getAllAds(): Promise<Ad[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.ads.values());
+    }
+    
+    try {
+      return await db.select().from(ads);
+    } catch (error) {
+      return Array.from(this.fallbackData.ads.values());
+    }
+  }
+
   async getActiveAds(): Promise<Ad[]> {
-    return await db.select().from(ads).where(eq(ads.active, true));
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.ads.values()).filter(ad => ad.active);
+    }
+    
+    try {
+      return await db.select().from(ads).where(eq(ads.active, true));
+    } catch (error) {
+      return Array.from(this.fallbackData.ads.values()).filter(ad => ad.active);
+    }
+  }
+
+  async getAd(id: string): Promise<Ad | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.ads.get(id);
+    }
+    
+    try {
+      const result = await db.select().from(ads).where(eq(ads.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return this.fallbackData.ads.get(id);
+    }
   }
 
   async createAd(insertAd: InsertAd): Promise<Ad> {
-    const result = await db.insert(ads).values(insertAd).returning();
-    return result[0];
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const id = randomUUID();
+      const ad: Ad = {
+        ...insertAd,
+        id,
+        imageUrl: insertAd.imageUrl ?? null,
+        link: insertAd.link ?? null,
+        description: insertAd.description ?? null,
+        active: insertAd.active ?? true,
+      };
+      this.fallbackData.ads.set(id, ad);
+      return ad;
+    }
+    
+    try {
+      const result = await db.insert(ads).values(insertAd).returning();
+      return result[0];
+    } catch (error) {
+      const id = randomUUID();
+      const ad: Ad = {
+        ...insertAd,
+        id,
+        imageUrl: insertAd.imageUrl ?? null,
+        link: insertAd.link ?? null,
+        description: insertAd.description ?? null,
+        active: insertAd.active ?? true,
+      };
+      this.fallbackData.ads.set(id, ad);
+      return ad;
+    }
+  }
+
+  async updateAd(id: string, updates: Partial<Ad>): Promise<Ad | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const existing = this.fallbackData.ads.get(id);
+      if (existing) {
+        const updated = { ...existing, ...updates };
+        this.fallbackData.ads.set(id, updated);
+        return updated;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(ads)
+        .set(updates)
+        .where(eq(ads.id, id))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      const existing = this.fallbackData.ads.get(id);
+      if (existing) {
+        const updated = { ...existing, ...updates };
+        this.fallbackData.ads.set(id, updated);
+        return updated;
+      }
+      return undefined;
+    }
+  }
+
+  async deleteAd(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.ads.delete(id);
+    }
+    
+    try {
+      await db.delete(ads).where(eq(ads.id, id));
+      return true;
+    } catch (error) {
+      return this.fallbackData.ads.delete(id);
+    }
   }
 
   // Order operations
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
-    const result = await db.insert(orders).values(insertOrder).returning();
-    return result[0];
+    await this.ensureInitialized();
+    
+    try {
+      const result = await db.insert(orders).values(insertOrder).returning();
+      return result[0];
+    } catch (error) {
+      const id = randomUUID();
+      const order: Order = {
+        ...insertOrder,
+        id,
+        status: insertOrder.status ?? "pending",
+        createdAt: new Date(),
+      };
+      this.fallbackData.orders.set(id, order);
+      return order;
+    }
   }
 
   async getUserOrders(userId: string): Promise<Order[]> {
-    return await db.select().from(orders).where(eq(orders.userId, userId));
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.orders.values()).filter(order => order.userId === userId);
+    }
+    
+    try {
+      return await db.select().from(orders).where(eq(orders.userId, userId));
+    } catch (error) {
+      return Array.from(this.fallbackData.orders.values()).filter(order => order.userId === userId);
+    }
+  }
+
+  // Truck location operations
+  async getTruckLocation(): Promise<TruckLocation | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.truckLocation || undefined;
+    }
+    
+    try {
+      const result = await db.select().from(truckLocation).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return this.fallbackData.truckLocation || undefined;
+    }
+  }
+
+  async updateTruckLocation(location: InsertTruckLocation): Promise<TruckLocation> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const id = this.fallbackData.truckLocation?.id || randomUUID();
+      const truckLoc: TruckLocation = {
+        ...location,
+        id,
+        latitude: location.latitude ?? null,
+        longitude: location.longitude ?? null,
+        radius: location.radius ?? "5.00",
+        gpsEnabled: location.gpsEnabled ?? false,
+        updatedAt: new Date(),
+      };
+      this.fallbackData.truckLocation = truckLoc;
+      return truckLoc;
+    }
+    
+    try {
+      // First try to update existing record
+      const existing = await this.getTruckLocation();
+      if (existing) {
+        const result = await db.update(truckLocation)
+          .set({ ...location, updatedAt: new Date() })
+          .where(eq(truckLocation.id, existing.id))
+          .returning();
+        return result[0];
+      } else {
+        // Create new record
+        const result = await db.insert(truckLocation).values(location).returning();
+        return result[0];
+      }
+    } catch (error) {
+      const id = this.fallbackData.truckLocation?.id || randomUUID();
+      const truckLoc: TruckLocation = {
+        ...location,
+        id,
+        latitude: location.latitude ?? null,
+        longitude: location.longitude ?? null,
+        radius: location.radius ?? "5.00",
+        gpsEnabled: location.gpsEnabled ?? false,
+        updatedAt: new Date(),
+      };
+      this.fallbackData.truckLocation = truckLoc;
+      return truckLoc;
+    }
+  }
+
+  // Settings operations
+  async getSetting(key: string): Promise<Settings | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return this.fallbackData.settings.get(key);
+    }
+    
+    try {
+      const result = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return this.fallbackData.settings.get(key);
+    }
+  }
+
+  async setSetting(key: string, value: string): Promise<Settings> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const existing = this.fallbackData.settings.get(key);
+      const id = existing?.id || randomUUID();
+      const setting: Settings = {
+        id,
+        key,
+        value,
+        updatedAt: new Date(),
+      };
+      this.fallbackData.settings.set(key, setting);
+      return setting;
+    }
+    
+    try {
+      // First try to update existing setting
+      const existing = await this.getSetting(key);
+      if (existing) {
+        const result = await db.update(settings)
+          .set({ value, updatedAt: new Date() })
+          .where(eq(settings.id, existing.id))
+          .returning();
+        return result[0];
+      } else {
+        // Create new setting
+        const result = await db.insert(settings).values({ key, value }).returning();
+        return result[0];
+      }
+    } catch (error) {
+      const existing = this.fallbackData.settings.get(key);
+      const id = existing?.id || randomUUID();
+      const setting: Settings = {
+        id,
+        key,
+        value,
+        updatedAt: new Date(),
+      };
+      this.fallbackData.settings.set(key, setting);
+      return setting;
+    }
+  }
+
+  async getAllSettings(): Promise<Settings[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.settings.values());
+    }
+    
+    try {
+      return await db.select().from(settings);
+    } catch (error) {
+      return Array.from(this.fallbackData.settings.values());
+    }
   }
 }
 
