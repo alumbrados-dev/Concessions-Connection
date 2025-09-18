@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useCart } from "@/hooks/use-cart";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Link } from "wouter";
+import { Shield, LogOut, LogIn } from "lucide-react";
 
 interface HeaderProps {
   onShowAbout?: () => void;
@@ -19,7 +22,11 @@ export default function Header({
   onCartClick
 }: HeaderProps) {
   const { itemCount } = useCart();
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Check if user is admin (either from environment or database role)
+  const isAdmin = user?.isAdmin || false;
 
   const handleMenuAction = (action: (() => void) | undefined, actionName: string) => {
     if (action) {
@@ -92,6 +99,24 @@ export default function Header({
                 <h2 className="font-heading text-2xl font-bold">Menu</h2>
                 
                 <div className="space-y-4">
+                  {/* Admin Panel Link - Only visible to administrators */}
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-left h-auto p-4 border-2 border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/20 dark:hover:bg-red-950/40"
+                      onClick={() => setIsMenuOpen(false)}
+                      data-testid="menu-button-admin-panel"
+                      asChild
+                    >
+                      <Link href="/admin">
+                        <div className="flex items-center space-x-3">
+                          <Shield className="w-5 h-5 text-red-600" />
+                          <span className="text-lg font-medium text-red-700 dark:text-red-400">Admin Panel</span>
+                        </div>
+                      </Link>
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-left h-auto p-4"
@@ -139,6 +164,49 @@ export default function Header({
                       <span className="text-lg">App Info</span>
                     </div>
                   </Button>
+                  
+                  {/* Authentication Section */}
+                  <div className="pt-4 border-t border-border">
+                    {user ? (
+                      <>
+                        <div className="px-4 py-2 mb-4 bg-muted rounded-lg">
+                          <p className="text-sm font-medium">{user.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {isAdmin ? 'Administrator' : 'Customer'}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-left h-auto p-4"
+                          onClick={() => {
+                            logout();
+                            setIsMenuOpen(false);
+                          }}
+                          data-testid="menu-button-logout"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <LogOut className="w-5 h-5" />
+                            <span className="text-lg">Logout</span>
+                          </div>
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-left h-auto p-4"
+                        onClick={() => setIsMenuOpen(false)}
+                        data-testid="menu-button-login"
+                        asChild
+                      >
+                        <Link href="/login">
+                          <div className="flex items-center space-x-3">
+                            <LogIn className="w-5 h-5" />
+                            <span className="text-lg">Login</span>
+                          </div>
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </SheetContent>

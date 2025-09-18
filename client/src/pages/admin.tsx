@@ -23,7 +23,12 @@ import {
   Navigation,
   AlertTriangle,
   Bot,
-  Zap
+  Zap,
+  Users,
+  Search,
+  Shield,
+  CheckCircle2,
+  Circle
 } from "lucide-react";
 
 // AI Settings Tab Implementation
@@ -215,6 +220,197 @@ function AISettingsTab() {
               <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
                 Enable AI functionality above to activate voice assistant, smart recommendations, and chat support features for your customers.
               </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// User Management Tab Implementation
+function UserManagementTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch users with search
+  const { data: users = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['/api/admin/users', debouncedSearchTerm],
+    queryFn: () => {
+      const params = debouncedSearchTerm ? `?search=${encodeURIComponent(debouncedSearchTerm)}` : '';
+      return apiRequest('GET', `/api/admin/users${params}`);
+    }
+  });
+
+  // Update user role mutation
+  const updateUserRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: "admin" | "customer" }) =>
+      apiRequest('PUT', `/api/admin/users/${userId}/role`, { role }),
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: "User Role Updated",
+        description: `${updatedUser.email} has been ${updatedUser.role === 'admin' ? 'promoted to admin' : 'changed to customer'}.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update user role. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleRoleChange = (user: any, newRole: "admin" | "customer") => {
+    updateUserRoleMutation.mutate({ userId: user.id, role: newRole });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading users...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" data-testid="alert-user-management-error">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Failed to Load Users</AlertTitle>
+          <AlertDescription>
+            {error?.message || "Unable to fetch users. Please check your connection and try again."}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-user-management">
+            <Users className="w-6 h-6 text-blue-600" />
+            <span>User Management</span>
+          </h2>
+          <p className="text-muted-foreground">Search and manage user roles and permissions</p>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Search Interface */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Search className="w-5 h-5" />
+            <span>Search Users</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2">
+            <Input
+              placeholder="Search by email address..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              data-testid="input-user-search"
+              className="flex-1"
+            />
+            <Button 
+              variant="outline" 
+              onClick={() => refetch()}
+              disabled={isLoading}
+              data-testid="button-refresh-users"
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+          </div>
+          {debouncedSearchTerm && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Searching for: "{debouncedSearchTerm}"
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Users List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Shield className="w-5 h-5" />
+            <span>Users ({users.length})</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {users.length === 0 ? (
+            <div className="text-center py-8" data-testid="text-no-users">
+              {debouncedSearchTerm ? 'No users found matching your search.' : 'No users found.'}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {users.map((user: any) => (
+                <div 
+                  key={user.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                  data-testid={`user-item-${user.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-1">
+                        <p className="font-medium" data-testid={`user-email-${user.id}`}>
+                          {user.email}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Joined: {new Date(user.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className={`px-2 py-1 rounded text-xs font-medium ${
+                          user.role === 'admin' 
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' 
+                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                        }`} data-testid={`user-role-${user.id}`}>
+                          {user.role === 'admin' ? 'Administrator' : 'Customer'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <Button
+                      variant={user.role === 'admin' ? "destructive" : "default"}
+                      size="sm"
+                      onClick={() => handleRoleChange(user, user.role === 'admin' ? 'customer' : 'admin')}
+                      disabled={updateUserRoleMutation.isPending}
+                      data-testid={`button-toggle-role-${user.id}`}
+                    >
+                      {updateUserRoleMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : user.role === 'admin' ? (
+                        <>
+                          <Circle className="w-4 h-4 mr-1" />
+                          Remove Admin
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                          Make Admin
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
@@ -2395,6 +2591,14 @@ export default function Admin() {
                   AI Settings
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="user-management" 
+                  className="manila-tab"
+                  data-testid="tab-user-management"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  User Management
+                </TabsTrigger>
+                <TabsTrigger 
                   value="gps" 
                   className="manila-tab"
                   data-testid="tab-gps"
@@ -2441,6 +2645,9 @@ export default function Admin() {
             <Card className="manila-content bg-amber-50 dark:bg-gray-800 border-2 border-amber-200 dark:border-gray-700">
               <TabsContent value="ai-settings" className="m-0">
                 <AISettingsTab />
+              </TabsContent>
+              <TabsContent value="user-management" className="m-0">
+                <UserManagementTab />
               </TabsContent>
               <TabsContent value="gps" className="m-0">
                 <GPSLocatorTab />

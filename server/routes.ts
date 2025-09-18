@@ -109,8 +109,10 @@ async function requireAdmin(req: any, res: any, next: any) {
       return res.status(401).json({ error: "Token email mismatch" });
     }
 
-    // Strict admin allowlist - using environment variables for security
-    const isAdmin = isAdminEmail(user.email);
+    // Admin check: Environment variable OR database role
+    const isEnvAdmin = isAdminEmail(user.email);
+    const isDatabaseAdmin = user.role === "admin";
+    const isAdmin = isEnvAdmin || isDatabaseAdmin;
     
     if (!isAdmin) {
       return res.status(403).json({ error: "Admin access required" });
@@ -155,12 +157,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email } = z.object({ email: z.string().email() }).parse(req.body);
       
-      // SECURITY FIX: Block admin account creation/access until proper verification
-      if (isAdminEmail(email)) {
-        return res.status(403).json({ 
-          error: "Admin access requires out-of-band verification. Contact system administrator for secure access setup." 
-        });
-      }
+      // Allow admin emails to go through normal verification flow
+      // Admin privileges are granted after successful email verification based on ADMIN_EMAILS env var
 
       // Cleanup expired verifications
       await storage.cleanupExpiredVerifications();
@@ -300,7 +298,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Token email mismatch" });
       }
 
-      res.json({ user });
+      // Add admin status to response for frontend use
+      const isEnvAdmin = isAdminEmail(user.email);
+      const isDatabaseAdmin = user.role === "admin";
+      const isAdmin = isEnvAdmin || isDatabaseAdmin;
+      
+      res.json({ 
+        user: {
+          ...user,
+          isAdmin // Add convenience field
+        }
+      });
     } catch (error) {
       console.error('Token verification failed:', error);
       res.status(401).json({ error: "Invalid or expired token" });
@@ -585,6 +593,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(orders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  // Admin routes for user management
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const { search } = req.query;
+      let users;
+      
+      if (search && typeof search === 'string') {
+        users = await storage.searchUsers(search);
+      } else {
+        users = await storage.getAllUsers();
+      }
+      
+      res.json(users);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.put("/api/admin/users/:id/role", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = z.object({ 
+        role: z.enum(["admin", "customer"]) 
+      }).parse(req.body);
+      
+      // Get the user being updated
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Check if we're trying to demote an admin to customer
+      if (targetUser.role === "admin" && role === "customer") {
+        const currentAdminCount = await storage.countAdminUsers();
+        
+        // Prevent demoting the last admin
+        if (currentAdminCount <= 1) {
+          return res.status(400).json({ 
+            error: "Cannot demote the last remaining admin. The system must have at least one administrator." 
+          });
+        }
+        
+        // Prevent self-demotion (optional security measure)
+        if (req.user && req.user.id === id) {
+          return res.status(400).json({ 
+            error: "You cannot demote yourself from admin role. Another admin must perform this action." 
+          });
+        }
+      }
+      
+      const updatedUser = await storage.updateUserRole(id, role);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Failed to update user role:', error);
+      res.status(400).json({ error: "Invalid request" });
     }
   });
 

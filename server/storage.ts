@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings, type EmailVerification, type InsertEmailVerification } from "@shared/schema";
 import { db, users, items, localEvents, ads, orders, truckLocation, settings, emailVerifications } from "./lib/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, like, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -8,6 +8,10 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  searchUsers(query: string): Promise<User[]>;
+  updateUserRole(userId: string, role: "admin" | "customer"): Promise<User | undefined>;
+  countAdminUsers(): Promise<number>;
 
   // Item operations
   getAllItems(): Promise<Item[]>;
@@ -316,6 +320,9 @@ export class DatabaseStorage implements IStorage {
 
       await db.insert(ads).values(sampleAds);
       console.log('Database initialized successfully');
+
+      // Admin seeding: Create admin users from ADMIN_EMAILS environment variable
+      await this.seedAdminUsers();
     } catch (error) {
       console.error('Failed to initialize database, using fallback mode:', error);
       this.fallbackMode = true;
@@ -590,6 +597,60 @@ export class DatabaseStorage implements IStorage {
     this.fallbackData.events.set(fallbackEvent.id, fallbackEvent);
   }
 
+  private async seedAdminUsers(): Promise<void> {
+    try {
+      // Check if admin users already exist
+      const existingAdminCount = await this.countAdminUsers();
+      if (existingAdminCount > 0) {
+        return; // Admin users already exist, no seeding needed
+      }
+
+      // Get admin emails from environment variable
+      const adminEmailsEnv = process.env.ADMIN_EMAILS;
+      if (!adminEmailsEnv) {
+        console.log('⚠️  ADMIN_EMAILS environment variable not set. Skipping admin user seeding.');
+        return;
+      }
+
+      const adminEmails = adminEmailsEnv.split(',').map(email => email.trim()).filter(email => email.length > 0);
+      if (adminEmails.length === 0) {
+        console.log('⚠️  No valid admin emails found in ADMIN_EMAILS. Skipping admin user seeding.');
+        return;
+      }
+
+      console.log(`🔧 Seeding ${adminEmails.length} admin user(s) from ADMIN_EMAILS...`);
+
+      // Create admin users for each email
+      for (const email of adminEmails) {
+        // Check if user already exists
+        const existingUser = await this.getUserByEmail(email);
+        if (existingUser) {
+          // User exists, ensure they have admin role
+          if (existingUser.role !== "admin") {
+            await this.updateUserRole(existingUser.id, "admin");
+            console.log(`✅ Updated existing user ${email} to admin role`);
+          } else {
+            console.log(`ℹ️  User ${email} already exists as admin`);
+          }
+        } else {
+          // Create new admin user
+          const adminUser = await this.createUser({
+            email,
+            role: "admin",
+            orderHistory: [],
+            preferences: {}
+          });
+          console.log(`✅ Created new admin user: ${email}`);
+        }
+      }
+
+      console.log('🎉 Admin user seeding completed successfully');
+    } catch (error) {
+      console.error('❌ Failed to seed admin users:', error);
+      // Don't throw error - initialization should continue even if admin seeding fails
+    }
+  }
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     await this.ensureInitialized();
@@ -629,6 +690,7 @@ export class DatabaseStorage implements IStorage {
       const user: User = {
         ...insertUser,
         id,
+        role: insertUser.role || "customer",
         orderHistory: insertUser.orderHistory || [],
         preferences: insertUser.preferences || {},
         createdAt: new Date(),
@@ -646,12 +708,87 @@ export class DatabaseStorage implements IStorage {
       const user: User = {
         ...insertUser,
         id,
+        role: insertUser.role || "customer",
         orderHistory: insertUser.orderHistory || [],
         preferences: insertUser.preferences || {},
         createdAt: new Date(),
       };
       this.fallbackData.users.set(id, user);
       return user;
+    }
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.users.values());
+    }
+    
+    try {
+      return await db.select().from(users);
+    } catch (error) {
+      return Array.from(this.fallbackData.users.values());
+    }
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.users.values())
+        .filter(user => user.email.toLowerCase().includes(query.toLowerCase()));
+    }
+    
+    try {
+      return await db.select().from(users).where(ilike(users.email, `%${query}%`));
+    } catch (error) {
+      return Array.from(this.fallbackData.users.values())
+        .filter(user => user.email.toLowerCase().includes(query.toLowerCase()));
+    }
+  }
+
+  async updateUserRole(userId: string, role: "admin" | "customer"): Promise<User | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const user = this.fallbackData.users.get(userId);
+      if (user) {
+        user.role = role;
+        this.fallbackData.users.set(userId, user);
+        return user;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(users).set({ role }).where(eq(users.id, userId)).returning();
+      return result[0] || undefined;
+    } catch (error) {
+      const user = this.fallbackData.users.get(userId);
+      if (user) {
+        user.role = role;
+        this.fallbackData.users.set(userId, user);
+        return user;
+      }
+      return undefined;
+    }
+  }
+
+  async countAdminUsers(): Promise<number> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.users.values())
+        .filter(user => user.role === "admin").length;
+    }
+    
+    try {
+      const result = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.role, "admin"));
+      return Number(result[0]?.count || 0);
+    } catch (error) {
+      return Array.from(this.fallbackData.users.values())
+        .filter(user => user.role === "admin").length;
     }
   }
 
