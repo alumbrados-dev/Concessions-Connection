@@ -7,11 +7,14 @@ export interface CartItem {
   price: string;
   quantity: number;
   imageUrl?: string;
+  taxRate?: string; // Tax rate for this item (e.g., "0.06" for 6%)
 }
 
 interface CartContextType {
   items: CartItem[];
   total: number;
+  subtotal: number;
+  taxAmount: number;
   itemCount: number;
   addItem: (item: Item, quantity?: number) => void;
   removeItem: (id: string) => void;
@@ -31,7 +34,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('cart_items', JSON.stringify(items));
   }, [items]);
 
-  const total = items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  // Calculate subtotal (price * quantity for all items)
+  const subtotal = items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  
+  // Calculate total tax amount (item tax * quantity for all items)
+  const taxAmount = items.reduce((sum, item) => {
+    const itemPrice = parseFloat(item.price);
+    const itemTaxRate = parseFloat(item.taxRate || "0.06"); // Default to 6% Maryland tax
+    const itemTax = itemPrice * itemTaxRate;
+    return sum + (itemTax * item.quantity);
+  }, 0);
+  
+  // Calculate total (subtotal + tax)
+  const total = subtotal + taxAmount;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const addItem = (item: Item, quantity = 1) => {
@@ -51,7 +66,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         name: item.name,
         price: item.price,
         quantity,
-        imageUrl: item.imageUrl || undefined
+        imageUrl: item.imageUrl || undefined,
+        taxRate: item.taxRate || "0.0600" // Default to Maryland 6% tax
       }];
     });
   };
@@ -81,6 +97,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     <CartContext.Provider value={{
       items,
       total,
+      subtotal,
+      taxAmount,
       itemCount,
       addItem,
       removeItem,

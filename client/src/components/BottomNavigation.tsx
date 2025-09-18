@@ -11,7 +11,7 @@ import DeliveryOptions from "./DeliveryOptions";
 import { Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 
 export default function BottomNavigation() {
-  const { items, total, itemCount, clearCart } = useCart();
+  const { items, total, subtotal, taxAmount, itemCount, clearCart } = useCart();
   const { token } = useAuth();
   const { toast } = useToast();
   const [location] = useLocation();
@@ -179,9 +179,21 @@ export default function BottomNavigation() {
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
         {itemCount > 0 && (
           <div className="p-4 border-b border-border">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-muted-foreground">Total:</span>
+            <div className="space-y-1 mb-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Subtotal:</span>
+                <span className="text-sm font-medium" data-testid="text-subtotal-amount">
+                  ${subtotal.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Tax:</span>
+                <span className="text-sm font-medium" data-testid="text-tax-amount">
+                  ${taxAmount.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-border">
+                <span className="text-sm font-semibold">Total:</span>
                 <span 
                   className="text-lg font-bold text-primary" 
                   data-testid="text-cart-total"
@@ -189,6 +201,7 @@ export default function BottomNavigation() {
                   ${total.toFixed(2)}
                 </span>
               </div>
+            </div>
               <span 
                 className="text-sm text-muted-foreground" 
                 data-testid="text-cart-items"

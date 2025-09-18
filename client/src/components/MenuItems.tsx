@@ -3,6 +3,7 @@ import { useCart } from "@/hooks/use-cart";
 import { useDevice } from "@/hooks/use-device";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Import category border images
 import startersImageMobile from "@assets/Starters-and-snacks_mobile_1758151930556.png";
@@ -25,6 +26,19 @@ export default function MenuItems({ items }: MenuItemsProps) {
   const getCartQuantity = (itemId: string) => {
     const cartItem = cartItems.find(item => item.id === itemId);
     return cartItem ? cartItem.quantity : 0;
+  };
+
+  // Calculate tax amount for an item
+  const calculateTaxAmount = (price: string, taxRate: string = "0.06") => {
+    const itemPrice = parseFloat(price);
+    const rate = parseFloat(taxRate);
+    return (itemPrice * rate).toFixed(2);
+  };
+
+  // Format tax rate as percentage
+  const formatTaxRate = (taxRate: string = "0.06") => {
+    const rate = parseFloat(taxRate) * 100;
+    return rate.toFixed(rate % 1 === 0 ? 0 : 1);
   };
 
   const handleQuantityChange = (item: Item, delta: number) => {
@@ -150,12 +164,43 @@ export default function MenuItems({ items }: MenuItemsProps) {
                         >
                           {item.name}
                         </h3>
-                        <span 
-                          className="text-lg font-bold text-orange-600 dark:text-orange-500" 
-                          data-testid={`text-item-price-${item.id}`}
-                        >
-                          ${item.price}
-                        </span>
+                        <div className="relative inline-flex items-center space-x-2">
+                          <span 
+                            className="text-lg font-bold text-orange-600 dark:text-orange-500" 
+                            data-testid={`text-item-price-${item.id}`}
+                          >
+                            ${item.price}
+                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="p-0 h-4 w-4 rounded-full bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 ml-1"
+                                data-testid={`button-tax-tooltip-${item.id}`}
+                              >
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">?</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <div className="space-y-2">
+                                <p className="font-semibold text-sm">Sales Tax Information</p>
+                                <div className="space-y-1 text-xs">
+                                  <p><strong>Tax Rate:</strong> {formatTaxRate(item.taxRate || "0.06")}%</p>
+                                  <p><strong>Tax Amount:</strong> ${calculateTaxAmount(item.price, item.taxRate)}</p>
+                                  <p><strong>Total with Tax:</strong> ${(parseFloat(item.price) + parseFloat(calculateTaxAmount(item.price, item.taxRate))).toFixed(2)}</p>
+                                </div>
+                                <div className="pt-1 border-t border-border">
+                                  <p className="text-xs text-muted-foreground">
+                                    {item.taxRate && parseFloat(item.taxRate) !== 0.06 
+                                      ? `Custom tax rate for this item` 
+                                      : `Maryland state sales tax (6%) applies to entire order`}
+                                  </p>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                       </div>
                       
                       {item.description && (

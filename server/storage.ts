@@ -20,6 +20,7 @@ export interface IStorage {
   updateItem(id: string, updates: Partial<Item>): Promise<Item | undefined>;
   deleteItem(id: string): Promise<boolean>;
   updateItemStock(id: string, stock: number): Promise<Item | undefined>;
+  updateItemTaxRate(id: string, taxRate: string): Promise<Item | undefined>;
 
   // Event operations
   getAllEvents(): Promise<LocalEvent[]>;
@@ -124,6 +125,7 @@ export class DatabaseStorage implements IStorage {
         stock: 20,
         category: "starters",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Mozzarella Sticks (6)",
@@ -132,6 +134,7 @@ export class DatabaseStorage implements IStorage {
         stock: 15,
         category: "starters",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Nachos",
@@ -140,6 +143,7 @@ export class DatabaseStorage implements IStorage {
         stock: 12,
         category: "starters",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "French Fries",
@@ -148,6 +152,7 @@ export class DatabaseStorage implements IStorage {
         stock: 25,
         category: "starters",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Chippin' Apple Dippers",
@@ -156,6 +161,7 @@ export class DatabaseStorage implements IStorage {
         stock: 8,
         category: "starters",
         available: true,
+        taxRate: "0.0600",
       },
       // Off the Grill
       {
@@ -165,6 +171,7 @@ export class DatabaseStorage implements IStorage {
         stock: 10,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Sliders (6)",
@@ -173,6 +180,7 @@ export class DatabaseStorage implements IStorage {
         stock: 8,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Sliders (12)",
@@ -181,6 +189,7 @@ export class DatabaseStorage implements IStorage {
         stock: 5,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Hot Dog",
@@ -189,6 +198,7 @@ export class DatabaseStorage implements IStorage {
         stock: 18,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Cheese Steak Sandwich",
@@ -197,6 +207,7 @@ export class DatabaseStorage implements IStorage {
         stock: 12,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Chicken Cheese Sandwich",
@@ -205,6 +216,7 @@ export class DatabaseStorage implements IStorage {
         stock: 12,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Chicken Tenders (3) & Fries",
@@ -213,6 +225,7 @@ export class DatabaseStorage implements IStorage {
         stock: 10,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Gyro",
@@ -221,6 +234,7 @@ export class DatabaseStorage implements IStorage {
         stock: 8,
         category: "grill",
         available: true,
+        taxRate: "0.0600",
       },
       // Refreshments
       {
@@ -230,6 +244,7 @@ export class DatabaseStorage implements IStorage {
         stock: 20,
         category: "drinks",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Apple Cider",
@@ -238,6 +253,7 @@ export class DatabaseStorage implements IStorage {
         stock: 15,
         category: "drinks",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Bottled Water",
@@ -246,6 +262,7 @@ export class DatabaseStorage implements IStorage {
         stock: 30,
         category: "drinks",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Can, Bottle, & Boxed Drinks",
@@ -254,6 +271,7 @@ export class DatabaseStorage implements IStorage {
         stock: 25,
         category: "drinks",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Gatorade",
@@ -262,6 +280,7 @@ export class DatabaseStorage implements IStorage {
         stock: 15,
         category: "drinks",
         available: true,
+        taxRate: "0.0600",
       },
       // Extras
       {
@@ -271,6 +290,7 @@ export class DatabaseStorage implements IStorage {
         stock: 10,
         category: "extras",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Cool Wrap",
@@ -279,6 +299,7 @@ export class DatabaseStorage implements IStorage {
         stock: 8,
         category: "extras",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Potato Chips",
@@ -287,6 +308,7 @@ export class DatabaseStorage implements IStorage {
         stock: 40,
         category: "extras",
         available: true,
+        taxRate: "0.0600",
       },
       {
         name: "Caesar Salad",
@@ -295,6 +317,7 @@ export class DatabaseStorage implements IStorage {
         stock: 10,
         category: "extras",
         available: true,
+        taxRate: "0.0600",
       },
     ];
 
@@ -900,6 +923,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateItemStock(id: string, stock: number): Promise<Item | undefined> {
     return this.updateItem(id, { stock });
+  }
+
+  async updateItemTaxRate(id: string, taxRate: string): Promise<Item | undefined> {
+    return this.updateItem(id, { taxRate });
   }
 
   async deleteItem(id: string): Promise<boolean> {

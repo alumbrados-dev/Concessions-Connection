@@ -21,6 +21,7 @@ export const items = pgTable("items", {
   category: text("category").notNull(),
   imageUrl: text("image_url"),
   available: boolean("available").default(true),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).notNull().default('0.0600'), // Maryland default 6%
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

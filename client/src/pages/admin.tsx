@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -783,7 +784,8 @@ function MenuManagementTab() {
     category: "",
     stock: "",
     imageUrl: "",
-    available: true
+    available: true,
+    taxRate: "0.0600" // Maryland default 6%
   });
 
   // Fetch all menu items
@@ -922,6 +924,38 @@ function MenuManagementTab() {
     }
   });
 
+  // Update tax rate mutation
+  const updateTaxRateMutation = useMutation({
+    mutationFn: ({ id, taxRate }: { id: string, taxRate: string }) => {
+      const token = localStorage.getItem('auth_token');
+      return fetch(`/api/items/${id}/tax-rate`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ taxRate })
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update tax rate');
+        return res.json();
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      toast({
+        title: "Tax Rate Updated",
+        description: "Item tax rate has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update tax rate. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const resetForm = () => {
     setItemForm({
       name: "",
@@ -930,7 +964,8 @@ function MenuManagementTab() {
       category: "",
       stock: "",
       imageUrl: "",
-      available: true
+      available: true,
+      taxRate: "0.0600" // Maryland default 6%
     });
   };
 
@@ -951,7 +986,8 @@ function MenuManagementTab() {
       category: itemForm.category || null,
       stock: parseInt(itemForm.stock) || 0,
       imageUrl: itemForm.imageUrl || null,
-      available: itemForm.available
+      available: itemForm.available,
+      taxRate: itemForm.taxRate
     };
 
     createItemMutation.mutate(itemData);
@@ -974,7 +1010,8 @@ function MenuManagementTab() {
       category: itemForm.category || null,
       stock: parseInt(itemForm.stock) || 0,
       imageUrl: itemForm.imageUrl || null,
-      available: itemForm.available
+      available: itemForm.available,
+      taxRate: itemForm.taxRate
     };
 
     updateItemMutation.mutate({ id: editingItem.id, data: itemData });
@@ -989,7 +1026,8 @@ function MenuManagementTab() {
       category: item.category || "",
       stock: item.stock.toString(),
       imageUrl: item.imageUrl || "",
-      available: item.available
+      available: item.available,
+      taxRate: item.taxRate || "0.0600"
     });
   };
 
@@ -1001,6 +1039,10 @@ function MenuManagementTab() {
 
   const handleStockUpdate = (id: string, newStock: number) => {
     updateStockMutation.mutate({ id, stock: newStock });
+  };
+
+  const handleTaxRateUpdate = (id: string, newTaxRate: string) => {
+    updateTaxRateMutation.mutate({ id, taxRate: newTaxRate });
   };
 
   if (isLoading) {
@@ -1210,6 +1252,52 @@ function MenuManagementTab() {
                     placeholder="0"
                     data-testid="input-item-stock"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="item-tax-rate">Tax Rate</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="p-0 h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800"
+                          data-testid="button-tax-tooltip"
+                        >
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">?</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <div className="space-y-2">
+                          <p className="font-semibold">Maryland Sales Tax</p>
+                          <p className="text-sm">
+                            Default rate is 6% for Maryland. You can adjust this rate per item if needed. 
+                            Tax is calculated as a percentage of the item price and will be displayed to customers.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Enter as decimal (e.g., 0.06 for 6%, 0.08 for 8%)
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input
+                    id="item-tax-rate"
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    max="1"
+                    value={itemForm.taxRate}
+                    onChange={(e) => setItemForm(prev => ({ ...prev, taxRate: e.target.value }))}
+                    placeholder="0.0600"
+                    data-testid="input-item-tax-rate"
+                  />
+                </div>
+                <div>
+                  {/* Empty space to maintain grid layout */}
                 </div>
               </div>
 

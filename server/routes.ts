@@ -14,6 +14,16 @@ import {
   insertNotificationPreferencesSchema
 } from "@shared/schema";
 import { z } from "zod";
+
+// Tax rate validation schema
+const taxRateUpdateSchema = z.object({
+  taxRate: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0 && num <= 1;
+  }, {
+    message: "Tax rate must be a number between 0 and 1 (0% to 100%)"
+  })
+});
 import { SquareClient, SquareEnvironment } from "square";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
@@ -396,6 +406,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(item);
     } catch (error) {
       res.status(400).json({ error: "Invalid request" });
+    }
+  });
+
+  app.patch("/api/items/:id/tax-rate", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { taxRate } = taxRateUpdateSchema.parse(req.body);
+      
+      const item = await storage.updateItemTaxRate(id, taxRate);
+      if (!item) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+      
+      // Broadcast tax rate update via WebSocket
+      broadcastToAll(JSON.stringify({
+        type: 'TAX_RATE_UPDATED',
+        data: item
+      }));
+      
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: error.message || "Invalid tax rate" });
     }
   });
 
