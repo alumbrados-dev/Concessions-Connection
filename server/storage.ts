@@ -36,6 +36,7 @@ export interface IStorage {
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
   getUserOrders(userId: string): Promise<Order[]>;
+  getAllOrders(): Promise<Order[]>;
 
   // Truck location operations
   getTruckLocation(): Promise<TruckLocation | undefined>;
@@ -1021,6 +1022,20 @@ export class DatabaseStorage implements IStorage {
       };
       this.fallbackData.orders.set(id, order);
       return order;
+    }
+  }
+
+  async getAllOrders(): Promise<Order[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.orders.values());
+    }
+    
+    try {
+      return await db.select().from(orders);
+    } catch (error) {
+      return Array.from(this.fallbackData.orders.values());
     }
   }
 
