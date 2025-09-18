@@ -3,8 +3,11 @@ import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { Shield, LogOut, LogIn } from "lucide-react";
+import { Shield, LogOut, LogIn, Star, Coins } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { PointsSettings } from "./PointsSettings";
 
 interface HeaderProps {
   onShowAbout?: () => void;
@@ -24,9 +27,16 @@ export default function Header({
   const { itemCount } = useCart();
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showPointsSettings, setShowPointsSettings] = useState(false);
   
   // Check if user is admin (either from environment or database role)
   const isAdmin = user?.isAdmin || false;
+
+  // Fetch user points status if logged in
+  const { data: pointsStatus } = useQuery({
+    queryKey: ['/api/points/status'],
+    enabled: !!user, // Only fetch if user is logged in
+  }) as { data: { pointsEnabled: boolean; totalPoints: number } | undefined };
 
   const handleMenuAction = (action: (() => void) | undefined, actionName: string) => {
     if (action) {
@@ -165,15 +175,73 @@ export default function Header({
                     </div>
                   </Button>
                   
+                  {/* Loyalty Points Menu Item - Only show if user has points enabled */}
+                  {user && pointsStatus?.pointsEnabled && (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-left h-auto p-4 bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/40 border border-yellow-200 dark:border-yellow-800"
+                      onClick={() => {
+                        setShowPointsSettings(true);
+                        setIsMenuOpen(false);
+                      }}
+                      data-testid="menu-button-points"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-3">
+                          <Star className="w-5 h-5 text-yellow-600" />
+                          <span className="text-lg font-medium text-yellow-800 dark:text-yellow-200">Loyalty Points</span>
+                        </div>
+                        <Badge variant="secondary" className="bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200">
+                          {pointsStatus.totalPoints}
+                        </Badge>
+                      </div>
+                    </Button>
+                  )}
+                  
+                  {/* Points Settings Menu Item - Show for all logged in users */}
+                  {user && (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-left h-auto p-4"
+                      onClick={() => {
+                        setShowPointsSettings(true);
+                        setIsMenuOpen(false);
+                      }}
+                      data-testid="menu-button-points-settings"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Coins className="w-5 h-5" />
+                        <span className="text-lg">
+                          {pointsStatus?.pointsEnabled ? 'Points Settings' : 'Enable Loyalty Points'}
+                        </span>
+                      </div>
+                    </Button>
+                  )}
+
                   {/* Authentication Section */}
                   <div className="pt-4 border-t border-border">
                     {user ? (
                       <>
                         <div className="px-4 py-2 mb-4 bg-muted rounded-lg">
-                          <p className="text-sm font-medium">{user.email}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {isAdmin ? 'Administrator' : 'Customer'}
-                          </p>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-sm font-medium">{user.email}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {isAdmin ? 'Administrator' : 'Customer'}
+                              </p>
+                            </div>
+                            {pointsStatus?.pointsEnabled && (
+                              <div className="text-right">
+                                <div className="flex items-center space-x-1">
+                                  <Star className="w-3 h-3 text-yellow-600" />
+                                  <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300" data-testid="text-header-points">
+                                    {pointsStatus.totalPoints}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">points</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <Button
                           variant="ghost"
@@ -213,6 +281,28 @@ export default function Header({
           </Sheet>
         </div>
       </div>
+
+      {/* Points Settings Modal */}
+      {showPointsSettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Loyalty Points</h2>
+              <Button
+                variant="ghost"
+                onClick={() => setShowPointsSettings(false)}
+                className="text-gray-500 hover:text-gray-700"
+                data-testid="button-close-header-points-settings"
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="p-4">
+              <PointsSettings showTitle={false} />
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

@@ -70,6 +70,12 @@ export interface IStorage {
   updatePushToken(userId: string, pushToken: string): Promise<NotificationPreferences | undefined>;
   togglePushNotifications(userId: string, enabled: boolean): Promise<NotificationPreferences | undefined>;
   getUsersWithPushEnabled(): Promise<NotificationPreferences[]>;
+
+  // Points system operations
+  updateUserPointsSettings(userId: string, pointsEnabled: boolean): Promise<User | undefined>;
+  getUserPointsBalance(userId: string): Promise<number>;
+  awardPoints(userId: string, points: number): Promise<User | undefined>;
+  getUserPointsStatus(userId: string): Promise<{ pointsEnabled: boolean; totalPoints: number } | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1715,6 +1721,133 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error getting users with push enabled:', error);
       return [];
+    }
+  }
+
+  // Points system methods
+  async updateUserPointsSettings(userId: string, pointsEnabled: boolean): Promise<User | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const user = this.fallbackData.users.get(userId);
+      if (user) {
+        user.pointsEnabled = pointsEnabled;
+        this.fallbackData.users.set(userId, user);
+        return user;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(users).set({ pointsEnabled }).where(eq(users.id, userId)).returning();
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error updating user points settings:', error);
+      const user = this.fallbackData.users.get(userId);
+      if (user) {
+        user.pointsEnabled = pointsEnabled;
+        this.fallbackData.users.set(userId, user);
+        return user;
+      }
+      return undefined;
+    }
+  }
+
+  async getUserPointsBalance(userId: string): Promise<number> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const user = this.fallbackData.users.get(userId);
+      return user?.totalPoints || 0;
+    }
+    
+    try {
+      const result = await db.select({ totalPoints: users.totalPoints }).from(users).where(eq(users.id, userId)).limit(1);
+      return result[0]?.totalPoints || 0;
+    } catch (error) {
+      console.error('Error getting user points balance:', error);
+      const user = this.fallbackData.users.get(userId);
+      return user?.totalPoints || 0;
+    }
+  }
+
+  async awardPoints(userId: string, points: number): Promise<User | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const user = this.fallbackData.users.get(userId);
+      if (user && user.pointsEnabled) {
+        user.totalPoints = (user.totalPoints || 0) + points;
+        this.fallbackData.users.set(userId, user);
+        return user;
+      }
+      return undefined;
+    }
+    
+    try {
+      // First check if user has points enabled
+      const userCheck = await db.select({ pointsEnabled: users.pointsEnabled, totalPoints: users.totalPoints })
+        .from(users).where(eq(users.id, userId)).limit(1);
+      
+      if (!userCheck[0]?.pointsEnabled) {
+        return undefined; // Don't award points if user hasn't opted in
+      }
+      
+      const newTotal = (userCheck[0].totalPoints || 0) + points;
+      const result = await db.update(users)
+        .set({ totalPoints: newTotal })
+        .where(eq(users.id, userId))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error awarding points:', error);
+      const user = this.fallbackData.users.get(userId);
+      if (user && user.pointsEnabled) {
+        user.totalPoints = (user.totalPoints || 0) + points;
+        this.fallbackData.users.set(userId, user);
+        return user;
+      }
+      return undefined;
+    }
+  }
+
+  async getUserPointsStatus(userId: string): Promise<{ pointsEnabled: boolean; totalPoints: number } | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const user = this.fallbackData.users.get(userId);
+      if (user) {
+        return {
+          pointsEnabled: user.pointsEnabled || false,
+          totalPoints: user.totalPoints || 0
+        };
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.select({ 
+        pointsEnabled: users.pointsEnabled, 
+        totalPoints: users.totalPoints 
+      }).from(users).where(eq(users.id, userId)).limit(1);
+      
+      if (result[0]) {
+        return {
+          pointsEnabled: result[0].pointsEnabled || false,
+          totalPoints: result[0].totalPoints || 0
+        };
+      }
+      return undefined;
+    } catch (error) {
+      console.error('Error getting user points status:', error);
+      const user = this.fallbackData.users.get(userId);
+      if (user) {
+        return {
+          pointsEnabled: user.pointsEnabled || false,
+          totalPoints: user.totalPoints || 0
+        };
+      }
+      return undefined;
     }
   }
 }

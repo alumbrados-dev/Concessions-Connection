@@ -820,6 +820,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Points system routes
+  app.get("/api/points/status", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const status = await storage.getUserPointsStatus(userId);
+      
+      if (!status) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(status);
+    } catch (error) {
+      console.error('Error fetching user points status:', error);
+      res.status(500).json({ error: "Failed to fetch points status" });
+    }
+  });
+
+  app.put("/api/points/preferences", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { pointsEnabled } = z.object({
+        pointsEnabled: z.boolean(),
+      }).parse(req.body);
+      
+      const updatedUser = await storage.updateUserPointsSettings(userId, pointsEnabled);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({
+        success: true,
+        message: pointsEnabled ? "Points system enabled!" : "Points system disabled.",
+        pointsEnabled: updatedUser.pointsEnabled,
+        totalPoints: updatedUser.totalPoints || 0
+      });
+    } catch (error) {
+      console.error('Error updating points preferences:', error);
+      res.status(400).json({ error: "Invalid points preferences data" });
+    }
+  });
+
+  app.get("/api/points/balance", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const balance = await storage.getUserPointsBalance(userId);
+      
+      res.json({ 
+        totalPoints: balance,
+        message: `You have ${balance} loyalty points!`
+      });
+    } catch (error) {
+      console.error('Error fetching points balance:', error);
+      res.status(500).json({ error: "Failed to fetch points balance" });
+    }
+  });
+
+  // Admin route for manually awarding points
+  app.post("/api/admin/points/award", requireAdmin, async (req, res) => {
+    try {
+      const { userId, points, reason } = z.object({
+        userId: z.string(),
+        points: z.number().int().positive(),
+        reason: z.string().optional()
+      }).parse(req.body);
+      
+      const updatedUser = await storage.awardPoints(userId, points);
+      
+      if (!updatedUser) {
+        return res.status(400).json({ error: "Failed to award points. User may not have points enabled or may not exist." });
+      }
+      
+      res.json({
+        success: true,
+        message: `Successfully awarded ${points} points to user.`,
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          totalPoints: updatedUser.totalPoints,
+          pointsEnabled: updatedUser.pointsEnabled
+        },
+        reason: reason || "Manual award by admin"
+      });
+    } catch (error) {
+      console.error('Error awarding points:', error);
+      res.status(400).json({ error: "Invalid points award data" });
+    }
+  });
+
   // Admin routes for user management
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
@@ -1036,6 +1125,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             payment.id,
             paymentMethod
           );
+
+          // Award loyalty points if user has opted in
+          try {
+            const userPointsStatus = await storage.getUserPointsStatus(tokenData.userId);
+            if (userPointsStatus?.pointsEnabled) {
+              // Calculate points: 10 points per $10 spent
+              const orderTotal = parseFloat(order.total);
+              const pointsToAward = Math.floor(orderTotal / 10) * 10; // 10 points per $10, rounded down
+              
+              if (pointsToAward > 0) {
+                const updatedUserWithPoints = await storage.awardPoints(tokenData.userId, pointsToAward);
+                if (updatedUserWithPoints) {
+                  console.log(`Points awarded: ${pointsToAward} points to user ${tokenData.userId} for order ${orderId} ($${orderTotal})`);
+                } else {
+                  console.warn(`Failed to award points to user ${tokenData.userId} for order ${orderId}`);
+                }
+              }
+            }
+          } catch (pointsError) {
+            // Don't fail the payment if points awarding fails - just log it
+            console.error('Error awarding points:', pointsError);
+          }
 
           res.json({
             success: true,

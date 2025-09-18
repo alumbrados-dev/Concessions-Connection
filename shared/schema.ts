@@ -9,6 +9,8 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("customer"), // "admin" or "customer"
   orderHistory: jsonb("order_history").default([]),
   preferences: jsonb("preferences").default({}),
+  pointsEnabled: boolean("points_enabled").default(false), // User opt-in for points system
+  totalPoints: integer("total_points").default(0), // Accumulated points balance
   createdAt: timestamp("created_at").defaultNow(),
 });
 

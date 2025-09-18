@@ -5,6 +5,7 @@ import { realtimeConnection } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useDevice } from "@/hooks/use-device";
 import { useAISettings } from "@/hooks/use-ai-settings";
+import { useAuth } from "@/hooks/use-auth";
 import Header from "@/components/Header";
 import LocationBanner from "@/components/LocationBanner";
 import MenuItems from "@/components/MenuItems";
@@ -14,6 +15,9 @@ import FloatingAIButton from "@/components/FloatingAIButton";
 import ShareModal from "@/components/ShareModal";
 import QRCodeModal from "@/components/QRCodeModal";
 import AppInfoModal from "@/components/AppInfoModal";
+import { PointsSettings } from "@/components/PointsSettings";
+import { Button } from "@/components/ui/button";
+import { Star } from "lucide-react";
 
 // Import hero images
 import concessionsImage from "@assets/1Concessions_1758151930547.png";
@@ -30,9 +34,11 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showAppModal, setShowAppModal] = useState(false);
+  const [showPointsSettings, setShowPointsSettings] = useState(false);
   const { toast } = useToast();
   const { isMobile, screenWidth } = useDevice();
   const { isAIEnabled } = useAISettings();
+  const { user } = useAuth();
 
   const { data: items = [], refetch: refetchItems } = useQuery<Item[]>({
     queryKey: ["/api/items"],
@@ -51,6 +57,12 @@ export default function Home() {
     queryKey: ['/api/truck-location'],
     refetchInterval: 30000, // Refresh every 30 seconds
   }) as { data: any };
+
+  // Fetch user points status if logged in
+  const { data: pointsStatus } = useQuery({
+    queryKey: ['/api/points/status'],
+    enabled: !!user, // Only fetch if user is logged in
+  }) as { data: { pointsEnabled: boolean; totalPoints: number } | undefined };
 
   useEffect(() => {
     const unsubscribeStock = realtimeConnection.subscribe('STOCK_UPDATED', (data) => {
@@ -176,6 +188,70 @@ export default function Home() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] h-[90%] bg-gradient-radial from-primary/8 via-transparent to-transparent rounded-full blur-3xl -z-10"></div>
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-accent/5 via-transparent to-primary/5 -z-20"></div>
       </section>
+
+      {/* Points System Toggle - Prominent on first page post-login */}
+      {user && pointsStatus !== undefined && !pointsStatus.pointsEnabled && (
+        <div className="bg-gradient-to-r from-yellow-50 via-amber-50 to-orange-50 dark:from-yellow-950/20 dark:via-amber-950/20 dark:to-orange-950/20 border-b-2 border-yellow-200 dark:border-yellow-800">
+          <div className="max-w-4xl mx-auto p-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="bg-yellow-100 dark:bg-yellow-900/30 p-3 rounded-full">
+                  <Star className="w-8 h-8 text-yellow-600" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-yellow-800 dark:text-yellow-200" data-testid="heading-points-toggle">
+                Enable Points (Earn 10 points per $10 spent)?
+              </h2>
+              <p className="text-yellow-700 dark:text-yellow-300 max-w-2xl mx-auto">
+                Join our loyalty program and earn points with every purchase! Get 10 points for every $10 you spend, 
+                and redeem them for exclusive rewards and discounts.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-2">
+                <Button 
+                  onClick={() => setShowPointsSettings(true)}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-8 py-3 text-lg font-medium rounded-full shadow-lg transform hover:scale-105 transition-all duration-200"
+                  data-testid="button-enable-points"
+                >
+                  Yes, Enable Points! ⭐
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    // Optionally track that user declined
+                    localStorage.setItem('points-offer-declined', 'true');
+                  }}
+                  className="border-yellow-300 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-900/20 px-6 py-2 rounded-full"
+                  data-testid="button-decline-points"
+                >
+                  Maybe Later
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Points Settings Modal */}
+      {showPointsSettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Loyalty Points</h2>
+              <Button
+                variant="ghost"
+                onClick={() => setShowPointsSettings(false)}
+                className="text-gray-500 hover:text-gray-700"
+                data-testid="button-close-points-settings"
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="p-4">
+              <PointsSettings showTitle={false} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Menu Categories */}
       <div className="bg-card border-b border-border mt-8">
