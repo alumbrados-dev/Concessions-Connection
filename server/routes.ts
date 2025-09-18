@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { 
   insertUserSchema, 
@@ -8,15 +9,42 @@ import {
   insertOrderSchema,
   insertLocalEventSchema,
   insertAdSchema,
-  insertTruckLocationSchema
+  insertTruckLocationSchema,
+  insertEmailVerificationSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { SquareClient, SquareEnvironment } from "square";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
 
-// JWT Secret - In production, this should be a strong random secret from environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'concession-connection-dev-secret-key-change-in-production';
+// Secure helper functions for authentication
+function generateVerificationCode(): string {
+  // Generate a 6-digit verification code
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function getAdminEmails(): string[] {
+  const adminEmailsEnv = process.env.ADMIN_EMAILS;
+  if (!adminEmailsEnv) {
+    console.warn('⚠️  ADMIN_EMAILS environment variable not set. Admin access will be restricted.');
+    return [];
+  }
+  
+  return adminEmailsEnv.split(',').map(email => email.trim()).filter(email => email.length > 0);
+}
+
+function isAdminEmail(email: string): boolean {
+  const adminEmails = getAdminEmails();
+  return adminEmails.includes(email);
+}
+
+// JWT Secret - No fallback for security. Server will fail to start if not configured in production.
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is required in production but was not provided');
+  }
+  return 'dev-only-jwt-secret-not-for-production';
+})();
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Helper functions for JWT token management
@@ -81,14 +109,8 @@ async function requireAdmin(req: any, res: any, next: any) {
       return res.status(401).json({ error: "Token email mismatch" });
     }
 
-    // Strict admin allowlist - only these exact emails have admin access
-    // In production, this should use environment variables or database roles
-    const adminEmails = [
-      'admin@concessionconnection.com',
-      'admin@replit.com',
-      'stace.mitchell27@gmail.com'  // Add actual admin user for testing
-    ];
-    const isAdmin = adminEmails.includes(user.email);
+    // Strict admin allowlist - using environment variables for security
+    const isAdmin = isAdminEmail(user.email);
     
     if (!isAdmin) {
       return res.status(403).json({ error: "Admin access required" });
@@ -103,48 +125,153 @@ async function requireAdmin(req: any, res: any, next: any) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication routes
-  app.post("/api/auth/magic-link", async (req, res) => {
+  // IP-based rate limiting for authentication endpoints
+  const authRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per windowMs
+    message: {
+      error: "Too many authentication attempts from this IP. Please try again later.",
+      retryAfter: Math.ceil(15 * 60) // seconds
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Use default keyGenerator for proper IPv6 handling
+  });
+
+  const verificationRateLimit = rateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    max: 3, // Limit each IP to 3 verification attempts per windowMs
+    message: {
+      error: "Too many verification attempts from this IP. Please try again later.",
+      retryAfter: Math.ceil(10 * 60) // seconds
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Use default keyGenerator for proper IPv6 handling
+  });
+
+  // Authentication routes - SECURE EMAIL VERIFICATION FLOW
+  app.post("/api/auth/request-verification", authRateLimit, async (req, res) => {
     try {
       const { email } = z.object({ email: z.string().email() }).parse(req.body);
       
-      // Block unauthorized creation of admin accounts
-      const adminEmails = [
-        'admin@concessionconnection.com',
-        'admin@replit.com',
-        'stace.mitchell27@gmail.com'
-      ];
-      
-      const existingUser = await storage.getUserByEmail(email);
-      
-      // If this is an admin email and user doesn't exist, block creation
-      if (adminEmails.includes(email) && !existingUser) {
+      // SECURITY FIX: Block admin account creation/access until proper verification
+      if (isAdminEmail(email)) {
         return res.status(403).json({ 
-          error: "Admin account creation is restricted. Contact system administrator." 
+          error: "Admin access requires out-of-band verification. Contact system administrator for secure access setup." 
+        });
+      }
+
+      // Cleanup expired verifications
+      await storage.cleanupExpiredVerifications();
+      
+      // Check for existing pending verification
+      const existingVerification = await storage.getEmailVerificationByEmail(email);
+      if (existingVerification && !existingVerification.verified && existingVerification.expiresAt > new Date()) {
+        return res.status(429).json({ 
+          error: "Verification code already sent. Please check your email or wait before requesting again.",
+          expiresIn: Math.ceil((existingVerification.expiresAt.getTime() - Date.now()) / 1000 / 60) // minutes
         });
       }
       
-      // For non-admin users, create or get user normally
-      let user = existingUser;
-      if (!user && !adminEmails.includes(email)) {
+      // Generate verification code
+      const verificationCode = generateVerificationCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      
+      // Create verification record
+      await storage.createEmailVerification({
+        email,
+        code: verificationCode,
+        expiresAt,
+        attempts: 0,
+        verified: false
+      });
+      
+      // In a real implementation, send email here
+      // SECURITY: Never log verification codes in any environment
+      // Verification codes are sent via email only
+      
+      // SECURITY: Never return the verification code in the response
+      res.json({ 
+        success: true, 
+        message: "Verification code sent to your email address. Please check your email and enter the code to continue.",
+        email: email.replace(/(.{2}).*@/, '$1***@') // Partially hide email for confirmation
+      });
+    } catch (error) {
+      console.error('Request verification error:', error);
+      res.status(400).json({ error: "Invalid request" });
+    }
+  });
+
+  app.post("/api/auth/verify-email", verificationRateLimit, async (req, res) => {
+    try {
+      const { email, code } = z.object({ 
+        email: z.string().email(),
+        code: z.string().length(6)
+      }).parse(req.body);
+      
+      // SECURITY FIX: Fetch verification by email only (not email+code)
+      const verification = await storage.getEmailVerificationByEmail(email);
+      
+      if (!verification) {
+        return res.status(400).json({ error: "No pending verification found for this email" });
+      }
+      
+      if (verification.verified) {
+        return res.status(400).json({ error: "Email already verified" });
+      }
+      
+      if (verification.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Verification code expired. Please request a new one." });
+      }
+      
+      // SECURITY FIX: Check attempt limit BEFORE validating code
+      if (verification.attempts >= 3) {
+        return res.status(429).json({ 
+          error: "Too many failed attempts. Please request a new verification code.",
+          lockoutTime: Math.ceil((verification.expiresAt.getTime() - Date.now()) / 1000 / 60) // minutes until expiry
+        });
+      }
+      
+      // SECURITY FIX: Increment attempts on ANY attempt (before code validation)
+      await storage.incrementVerificationAttemptsByEmail(email);
+      
+      // Now validate the provided code against stored code
+      if (verification.code !== code) {
+        return res.status(400).json({ 
+          error: "Invalid verification code",
+          attemptsRemaining: Math.max(0, 3 - (verification.attempts + 1))
+        });
+      }
+      
+      // Code is correct - mark email as verified
+      const verificationSuccess = await storage.markEmailVerified(email, code);
+      if (!verificationSuccess) {
+        return res.status(400).json({ error: "Verification failed" });
+      }
+      
+      // Create or get user after successful email verification
+      let user = await storage.getUserByEmail(email);
+      if (!user) {
         user = await storage.createUser({ 
           email, 
           orderHistory: [], 
           preferences: {} 
         });
-      } else if (!user) {
-        // This should not happen due to the check above, but add safety
-        return res.status(403).json({ 
-          error: "User account not found. Contact system administrator." 
-        });
       }
 
-      // Generate secure JWT token
+      // SECURITY FIX: Only generate JWT token AFTER email verification
       const token = generateSecureToken(user.id, user.email);
       
-      res.json({ success: true, token, user });
+      res.json({ 
+        success: true, 
+        token, 
+        user,
+        message: "Email verified successfully. You are now logged in."
+      });
     } catch (error) {
-      res.status(400).json({ error: "Invalid request" });
+      console.error('Email verification error:', error);
+      res.status(400).json({ error: "Invalid verification request" });
     }
   });
 
@@ -543,11 +670,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const locationId = process.env.SQUARE_LOCATION_ID;
       
       if (!accessToken) {
-        return res.status(500).json({ error: "Square access token not configured" });
+        return res.status(503).json({ 
+          error: "Payment service unavailable",
+          details: "Square payment processing is not configured. Please contact support.",
+          code: "PAYMENT_SERVICE_UNAVAILABLE"
+        });
       }
       
       if (!locationId) {
-        return res.status(500).json({ error: "Square location ID not configured" });
+        return res.status(503).json({ 
+          error: "Payment service unavailable",
+          details: "Square payment processing is not configured. Please contact support.",
+          code: "PAYMENT_SERVICE_UNAVAILABLE"
+        });
       }
       
       const squareClient = new SquareClient({

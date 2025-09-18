@@ -1,6 +1,6 @@
-import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings } from "@shared/schema";
-import { db, users, items, localEvents, ads, orders, truckLocation, settings } from "./lib/db";
-import { eq } from "drizzle-orm";
+import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings, type EmailVerification, type InsertEmailVerification } from "@shared/schema";
+import { db, users, items, localEvents, ads, orders, truckLocation, settings, emailVerifications } from "./lib/db";
+import { eq, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -48,6 +48,15 @@ export interface IStorage {
   getSetting(key: string): Promise<Settings | undefined>;
   setSetting(key: string, value: string): Promise<Settings>;
   getAllSettings(): Promise<Settings[]>;
+
+  // Email verification operations
+  createEmailVerification(verification: InsertEmailVerification): Promise<EmailVerification>;
+  getEmailVerification(email: string, code: string): Promise<EmailVerification | undefined>;
+  getEmailVerificationByEmail(email: string): Promise<EmailVerification | undefined>;
+  markEmailVerified(email: string, code: string): Promise<boolean>;
+  incrementVerificationAttempts(email: string, code: string): Promise<boolean>;
+  incrementVerificationAttemptsByEmail(email: string): Promise<boolean>;
+  cleanupExpiredVerifications(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -61,6 +70,7 @@ export class DatabaseStorage implements IStorage {
     orders: new Map<string, Order>(),
     truckLocation: null as TruckLocation | null,
     settings: new Map<string, Settings>(),
+    emailVerifications: new Map<string, EmailVerification>(),
   };
 
   constructor() {
@@ -1240,6 +1250,201 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(settings);
     } catch (error) {
       return Array.from(this.fallbackData.settings.values());
+    }
+  }
+
+  // Email verification operations
+  async createEmailVerification(insertVerification: InsertEmailVerification): Promise<EmailVerification> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const id = randomUUID();
+      const verification: EmailVerification = {
+        ...insertVerification,
+        id,
+        attempts: insertVerification.attempts || 0,
+        verified: insertVerification.verified || false,
+        createdAt: new Date(),
+      };
+      this.fallbackData.emailVerifications.set(id, verification);
+      return verification;
+    }
+    
+    try {
+      const result = await db.insert(emailVerifications).values(insertVerification).returning();
+      return result[0];
+    } catch (error) {
+      const id = randomUUID();
+      const verification: EmailVerification = {
+        ...insertVerification,
+        id,
+        attempts: insertVerification.attempts || 0,
+        verified: insertVerification.verified || false,
+        createdAt: new Date(),
+      };
+      this.fallbackData.emailVerifications.set(id, verification);
+      return verification;
+    }
+  }
+
+  async getEmailVerification(email: string, code: string): Promise<EmailVerification | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && v.code === code);
+    }
+    
+    try {
+      const result = await db.select().from(emailVerifications)
+        .where(and(eq(emailVerifications.email, email), eq(emailVerifications.code, code)))
+        .limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && v.code === code);
+    }
+  }
+
+  async getEmailVerificationByEmail(email: string): Promise<EmailVerification | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && !v.verified);
+    }
+    
+    try {
+      const result = await db.select().from(emailVerifications)
+        .where(eq(emailVerifications.email, email))
+        .orderBy(emailVerifications.createdAt)
+        .limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      return Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && !v.verified);
+    }
+  }
+
+  async markEmailVerified(email: string, code: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const verification = Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && v.code === code);
+      if (verification) {
+        verification.verified = true;
+        this.fallbackData.emailVerifications.set(verification.id, verification);
+        return true;
+      }
+      return false;
+    }
+    
+    try {
+      const result = await db.update(emailVerifications)
+        .set({ verified: true })
+        .where(and(eq(emailVerifications.email, email), eq(emailVerifications.code, code)))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      const verification = Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && v.code === code);
+      if (verification) {
+        verification.verified = true;
+        this.fallbackData.emailVerifications.set(verification.id, verification);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  async incrementVerificationAttempts(email: string, code: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const verification = Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && v.code === code);
+      if (verification) {
+        verification.attempts = (verification.attempts || 0) + 1;
+        this.fallbackData.emailVerifications.set(verification.id, verification);
+        return true;
+      }
+      return false;
+    }
+    
+    try {
+      const result = await db.update(emailVerifications)
+        .set({ attempts: sql`attempts + 1` })
+        .where(and(eq(emailVerifications.email, email), eq(emailVerifications.code, code)))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      const verification = Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && v.code === code);
+      if (verification) {
+        verification.attempts = (verification.attempts || 0) + 1;
+        this.fallbackData.emailVerifications.set(verification.id, verification);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  async incrementVerificationAttemptsByEmail(email: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const verification = Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && !v.verified);
+      if (verification) {
+        verification.attempts = (verification.attempts || 0) + 1;
+        this.fallbackData.emailVerifications.set(verification.id, verification);
+        return true;
+      }
+      return false;
+    }
+    
+    try {
+      const result = await db.update(emailVerifications)
+        .set({ attempts: sql`attempts + 1` })
+        .where(and(eq(emailVerifications.email, email), eq(emailVerifications.verified, false)))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      const verification = Array.from(this.fallbackData.emailVerifications.values())
+        .find(v => v.email === email && !v.verified);
+      if (verification) {
+        verification.attempts = (verification.attempts || 0) + 1;
+        this.fallbackData.emailVerifications.set(verification.id, verification);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  async cleanupExpiredVerifications(): Promise<void> {
+    await this.ensureInitialized();
+    
+    const now = new Date();
+    
+    if (this.fallbackMode) {
+      const toDelete = Array.from(this.fallbackData.emailVerifications.entries())
+        .filter(([_, v]) => v.expiresAt < now)
+        .map(([id, _]) => id);
+      
+      toDelete.forEach(id => this.fallbackData.emailVerifications.delete(id));
+      return;
+    }
+    
+    try {
+      await db.delete(emailVerifications)
+        .where(sql`${emailVerifications.expiresAt} < ${now}`);
+    } catch (error) {
+      const toDelete = Array.from(this.fallbackData.emailVerifications.entries())
+        .filter(([_, v]) => v.expiresAt < now)
+        .map(([id, _]) => id);
+      
+      toDelete.forEach(id => this.fallbackData.emailVerifications.delete(id));
     }
   }
 }

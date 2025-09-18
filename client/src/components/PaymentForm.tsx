@@ -36,6 +36,7 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [squareConfigured, setSquareConfigured] = useState(false);
   const [applePayAvailable, setApplePayAvailable] = useState(false);
   const [googlePayAvailable, setGooglePayAvailable] = useState(false);
   const [paymentForm, setPaymentForm] = useState<SquarePaymentForm | null>(null);
@@ -69,17 +70,21 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
           throw new Error('Square SDK failed to load');
         }
 
-        // Initialize payments - require proper environment variables
+        // Check Square environment configuration
         const applicationId = import.meta.env.VITE_SQUARE_APPLICATION_ID;
         const locationId = import.meta.env.VITE_SQUARE_LOCATION_ID;
         
-        if (!applicationId) {
-          throw new Error('Square Application ID not configured. Please set VITE_SQUARE_APPLICATION_ID environment variable.');
+        if (!applicationId || !locationId) {
+          console.warn('Square payment environment not configured:', {
+            hasApplicationId: !!applicationId,
+            hasLocationId: !!locationId
+          });
+          setSquareConfigured(false);
+          setIsLoading(false);
+          return;
         }
         
-        if (!locationId) {
-          throw new Error('Square Location ID not configured. Please set VITE_SQUARE_LOCATION_ID environment variable.');
-        }
+        setSquareConfigured(true);
         
         const payments = window.Square.payments(applicationId, locationId);
 
@@ -126,7 +131,13 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
         setIsLoading(false);
       } catch (err) {
         console.error('Square initialization error:', err);
-        setError('Failed to initialize payment form');
+        // Check if this is a configuration error vs a runtime error
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        if (errorMessage.includes('not configured') || errorMessage.includes('SDK failed')) {
+          setSquareConfigured(false);
+        } else {
+          setError('Failed to initialize payment form');
+        }
         setIsLoading(false);
       }
     };
@@ -236,6 +247,90 @@ export default function PaymentForm({ amount, orderId, onSuccess, onError, onCan
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
             <p>Loading payment form...</p>
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show service unavailable message when Square is not configured
+  if (!squareConfigured) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-600">
+            <CreditCard className="h-5 w-5" />
+            Payment Service Unavailable
+          </CardTitle>
+          <CardDescription>
+            Total: <span className="font-semibold text-lg">${amount.toFixed(2)}</span>
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              <div className="space-y-2">
+                <p className="font-medium">💳 Online payment is temporarily unavailable</p>
+                <p className="text-sm">
+                  Our payment processing service is currently being configured. 
+                  Please try one of these alternatives:
+                </p>
+                <ul className="text-sm list-disc list-inside ml-4 space-y-1">
+                  <li>Pay in person when picking up your order</li>
+                  <li>Contact us directly to arrange payment</li>
+                  <li>Try again later</li>
+                </ul>
+              </div>
+            </AlertDescription>
+          </Alert>
+
+          {/* Disabled Payment Options */}
+          <div className="space-y-3 opacity-60">
+            <p className="text-sm font-medium text-muted-foreground">Payment Options (Unavailable)</p>
+            
+            <Button
+              disabled
+              className="w-full bg-black text-white cursor-not-allowed"
+              data-testid="button-apple-pay-disabled"
+            >
+              <Smartphone className="h-4 w-4 mr-2" />
+              Apple Pay (Unavailable)
+            </Button>
+
+            <Button
+              disabled
+              className="w-full bg-blue-600 text-white cursor-not-allowed"
+              data-testid="button-google-pay-disabled"
+            >
+              <Smartphone className="h-4 w-4 mr-2" />
+              Google Pay (Unavailable)
+            </Button>
+
+            <Button
+              disabled
+              className="w-full cursor-not-allowed"
+              data-testid="button-card-pay-disabled"
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Pay with Card (Unavailable)
+            </Button>
+          </div>
+
+          {/* Alternative Contact Info */}
+          <div className="text-xs text-muted-foreground text-center space-y-1">
+            <p>📞 Need help? Contact us directly</p>
+            <p>We apologize for the inconvenience</p>
+          </div>
+
+          {/* Cancel Button */}
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="w-full"
+            data-testid="button-cancel-payment"
+          >
+            Close
+          </Button>
         </CardContent>
       </Card>
     );
