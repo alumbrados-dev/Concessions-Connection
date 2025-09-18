@@ -31,7 +31,12 @@ import {
   CheckCircle2,
   Circle,
   Bell,
-  Send
+  Send,
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  Eye,
+  MousePointer
 } from "lucide-react";
 import { NotificationSettings } from "@/components/NotificationSettings";
 
@@ -1380,14 +1385,17 @@ function EventsAdsTab() {
     description: "",
     date: "",
     location: "",
-    url: ""
+    imageUrl: "",
+    externalUrl: "",
+    sponsored: false
   });
   const [adForm, setAdForm] = useState({
     title: "",
     content: "",
     imageUrl: "",
     url: "",
-    type: ""
+    type: "",
+    sponsored: false
   });
 
   // Fetch events
@@ -1544,13 +1552,62 @@ function EventsAdsTab() {
     }
   });
 
+  // Sponsored status mutations
+  const updateEventSponsoredMutation = useMutation({
+    mutationFn: ({ id, sponsored }: { id: string; sponsored: boolean }) => 
+      apiRequest(`/api/admin/events/${id}/sponsored`, {
+        method: 'PUT',
+        body: JSON.stringify({ sponsored })
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast({
+        title: "Event Updated",
+        description: "Event sponsored status has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update event sponsored status.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateAdSponsoredMutation = useMutation({
+    mutationFn: ({ id, sponsored }: { id: string; sponsored: boolean }) => 
+      apiRequest(`/api/admin/ads/${id}/sponsored`, {
+        method: 'PUT',
+        body: JSON.stringify({ sponsored })
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/ads'] });
+      toast({
+        title: "Ad Updated", 
+        description: "Ad sponsored status has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update ad sponsored status.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const resetEventForm = () => {
     setEventForm({
       name: "",
       description: "",
       date: "",
       location: "",
-      url: ""
+      imageUrl: "",
+      externalUrl: "",
+      sponsored: false
     });
   };
 
@@ -1560,7 +1617,8 @@ function EventsAdsTab() {
       content: "",
       imageUrl: "",
       url: "",
-      type: ""
+      type: "",
+      sponsored: false
     });
   };
 
@@ -1575,11 +1633,13 @@ function EventsAdsTab() {
     }
 
     const eventData = {
-      name: eventForm.name,
+      eventName: eventForm.name,
       description: eventForm.description || null,
-      date: eventForm.date,
+      dateTime: eventForm.date,
       location: eventForm.location || null,
-      url: eventForm.url || null
+      imageUrl: eventForm.imageUrl || null,
+      externalUrl: eventForm.externalUrl || null,
+      sponsored: eventForm.sponsored
     };
 
     createEventMutation.mutate(eventData);
@@ -1596,11 +1656,13 @@ function EventsAdsTab() {
     }
 
     const eventData = {
-      name: eventForm.name,
+      eventName: eventForm.name,
       description: eventForm.description || null,
-      date: eventForm.date,
+      dateTime: eventForm.date,
       location: eventForm.location || null,
-      url: eventForm.url || null
+      imageUrl: eventForm.imageUrl || null,
+      externalUrl: eventForm.externalUrl || null,
+      sponsored: eventForm.sponsored
     };
 
     updateEventMutation.mutate({ id: editingEvent.id, data: eventData });
@@ -1617,11 +1679,12 @@ function EventsAdsTab() {
     }
 
     const adData = {
-      title: adForm.title,
-      content: adForm.content,
+      bizName: adForm.title,
+      description: adForm.content,
       imageUrl: adForm.imageUrl || null,
-      url: adForm.url || null,
-      type: adForm.type || null
+      link: adForm.url || null,
+      location: adForm.type || "Online",
+      sponsored: adForm.sponsored
     };
 
     createAdMutation.mutate(adData);
@@ -1638,11 +1701,12 @@ function EventsAdsTab() {
     }
 
     const adData = {
-      title: adForm.title,
-      content: adForm.content,
+      bizName: adForm.title,
+      description: adForm.content,
       imageUrl: adForm.imageUrl || null,
-      url: adForm.url || null,
-      type: adForm.type || null
+      link: adForm.url || null,
+      location: adForm.type || "Online",
+      sponsored: adForm.sponsored
     };
 
     updateAdMutation.mutate({ id: editingAd.id, data: adData });
@@ -1651,22 +1715,25 @@ function EventsAdsTab() {
   const handleEditEvent = (event: any) => {
     setEditingEvent(event);
     setEventForm({
-      name: event.name,
+      name: event.eventName || event.name || "",
       description: event.description || "",
-      date: event.date,
+      date: event.dateTime || event.date || "",
       location: event.location || "",
-      url: event.url || ""
+      imageUrl: event.imageUrl || "",
+      externalUrl: event.externalUrl || "",
+      sponsored: event.sponsored || false
     });
   };
 
   const handleEditAd = (ad: any) => {
     setEditingAd(ad);
     setAdForm({
-      title: ad.title,
-      content: ad.content,
+      title: ad.bizName || ad.title || "",
+      content: ad.description || ad.content || "",
       imageUrl: ad.imageUrl || "",
-      url: ad.url || "",
-      type: ad.type || ""
+      url: ad.link || ad.url || "",
+      type: ad.location || ad.type || "",
+      sponsored: ad.sponsored || false
     });
   };
 
@@ -1806,19 +1873,36 @@ function EventsAdsTab() {
                             )}
                             <div className="flex items-center space-x-4 mt-2">
                               <span className="text-sm font-medium">
-                                {new Date(event.date).toLocaleDateString()}
+                                {new Date(event.dateTime || event.date).toLocaleDateString()}
                               </span>
                               {event.location && (
                                 <span className="text-xs bg-secondary px-2 py-1 rounded">{event.location}</span>
                               )}
-                              <span className={`text-xs px-2 py-1 rounded ${new Date(event.date) >= new Date() ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
-                                {new Date(event.date) >= new Date() ? 'Upcoming' : 'Past'}
+                              <span className={`text-xs px-2 py-1 rounded ${new Date(event.dateTime || event.date) >= new Date() ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {new Date(event.dateTime || event.date) >= new Date() ? 'Upcoming' : 'Past'}
                               </span>
+                              {event.sponsored && (
+                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
+                                  💰 Sponsored
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor={`event-sponsored-${event.id}`} className="text-xs">
+                            Sponsored
+                          </Label>
+                          <Switch
+                            id={`event-sponsored-${event.id}`}
+                            checked={event.sponsored || false}
+                            onCheckedChange={(sponsored) => updateEventSponsoredMutation.mutate({ id: event.id, sponsored })}
+                            disabled={updateEventSponsoredMutation.isPending}
+                            data-testid={`switch-event-sponsored-${event.id}`}
+                          />
+                        </div>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1899,23 +1983,40 @@ function EventsAdsTab() {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
                           <div className="flex-1">
-                            <h3 className="font-semibold">{ad.title}</h3>
-                            <p className="text-sm text-muted-foreground">{ad.content}</p>
+                            <h3 className="font-semibold">{ad.bizName || ad.title}</h3>
+                            <p className="text-sm text-muted-foreground">{ad.description || ad.content}</p>
                             <div className="flex items-center space-x-4 mt-2">
-                              {ad.type && (
-                                <span className="text-xs bg-secondary px-2 py-1 rounded">{ad.type}</span>
+                              {(ad.location || ad.type) && (
+                                <span className="text-xs bg-secondary px-2 py-1 rounded">{ad.location || ad.type}</span>
                               )}
                               {ad.imageUrl && (
                                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Has Image</span>
                               )}
-                              {ad.url && (
+                              {(ad.link || ad.url) && (
                                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Has Link</span>
+                              )}
+                              {ad.sponsored && (
+                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
+                                  💰 Sponsored
+                                </span>
                               )}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor={`ad-sponsored-${ad.id}`} className="text-xs">
+                            Sponsored
+                          </Label>
+                          <Switch
+                            id={`ad-sponsored-${ad.id}`}
+                            checked={ad.sponsored || false}
+                            onCheckedChange={(sponsored) => updateAdSponsoredMutation.mutate({ id: ad.id, sponsored })}
+                            disabled={updateAdSponsoredMutation.isPending}
+                            data-testid={`switch-ad-sponsored-${ad.id}`}
+                          />
+                        </div>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1996,14 +2097,37 @@ function EventsAdsTab() {
               </div>
 
               <div>
-                <Label htmlFor="event-url">Event URL</Label>
+                <Label htmlFor="event-image-url">Event Image URL</Label>
                 <Input
-                  id="event-url"
-                  value={eventForm.url}
-                  onChange={(e) => setEventForm(prev => ({ ...prev, url: e.target.value }))}
-                  placeholder="https://example.com/event"
-                  data-testid="input-event-url"
+                  id="event-image-url"
+                  value={eventForm.imageUrl}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  placeholder="https://example.com/image.jpg"
+                  data-testid="input-event-image-url"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="event-external-url">External URL (for clicks)</Label>
+                <Input
+                  id="event-external-url"
+                  value={eventForm.externalUrl}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, externalUrl: e.target.value }))}
+                  placeholder="https://example.com/event"
+                  data-testid="input-event-external-url"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="event-sponsored"
+                  checked={eventForm.sponsored}
+                  onCheckedChange={(sponsored) => setEventForm(prev => ({ ...prev, sponsored }))}
+                  data-testid="switch-event-form-sponsored"
+                />
+                <Label htmlFor="event-sponsored" className="text-sm font-medium">
+                  Mark as Sponsored Content
+                </Label>
               </div>
             </CardContent>
             <div className="flex justify-end space-x-2 p-6 pt-0">
@@ -2098,6 +2222,18 @@ function EventsAdsTab() {
                   placeholder="https://example.com/offer"
                   data-testid="input-ad-url"
                 />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="ad-sponsored"
+                  checked={adForm.sponsored}
+                  onCheckedChange={(sponsored) => setAdForm(prev => ({ ...prev, sponsored }))}
+                  data-testid="switch-ad-form-sponsored"
+                />
+                <Label htmlFor="ad-sponsored" className="text-sm font-medium">
+                  Mark as Sponsored Content
+                </Label>
               </div>
             </CardContent>
             <div className="flex justify-end space-x-2 p-6 pt-0">
@@ -2808,6 +2944,252 @@ function HoursLocationTab() {
   );
 }
 
+function RevenueAnalyticsTab() {
+  const { toast } = useToast();
+  const [dateRange, setDateRange] = useState<string>('7');
+
+  // Fetch sponsored content analytics
+  const { data: analytics = {}, isLoading: analyticsLoading, error: analyticsError } = useQuery({
+    queryKey: ['/api/admin/analytics/sponsored-content', dateRange],
+    queryFn: () => apiRequest('/api/admin/analytics/sponsored-content')
+  }) as { data: any, isLoading: boolean, error: any };
+
+  // Fetch revenue analytics
+  const { data: revenueStats = {}, isLoading: revenueLoading, error: revenueError } = useQuery({
+    queryKey: ['/api/admin/analytics/revenue', dateRange],
+    queryFn: () => apiRequest(`/api/admin/analytics/revenue${dateRange ? `?days=${dateRange}` : ''}`)
+  }) as { data: any, isLoading: boolean, error: any };
+
+  const isLoading = analyticsLoading || revenueLoading;
+  const hasError = analyticsError || revenueError;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading revenue analytics...</span>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive" data-testid="alert-analytics-error">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Failed to Load Analytics</AlertTitle>
+          <AlertDescription>
+            Unable to fetch revenue analytics data. Please check your connection and try again.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-revenue-analytics">
+            <BarChart3 className="w-6 h-6 text-green-600" />
+            <span>Revenue Analytics</span>
+          </h2>
+          <p className="text-muted-foreground">Track sponsored content performance and revenue metrics</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="date-range" className="text-sm font-medium">Time Period:</Label>
+          <select
+            id="date-range"
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="border rounded px-3 py-1 text-sm"
+            data-testid="select-date-range"
+          >
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Key Performance Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              <span className="text-sm font-medium">Total Revenue</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600" data-testid="metric-total-revenue">
+              ${analytics.totalRevenue || '0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {analytics.revenueChange > 0 ? '+' : ''}{analytics.revenueChange || '0'}% from last period
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <MousePointer className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium">Total Clicks</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-600" data-testid="metric-total-clicks">
+              {analytics.totalSponsoredAdClicks + analytics.totalSponsoredEventClicks || 0}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sponsored content clicks
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+              <span className="text-sm font-medium">CTR</span>
+            </div>
+            <div className="text-2xl font-bold text-purple-600" data-testid="metric-ctr">
+              {analytics.clickThroughRate || '0.0'}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Click-through rate
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <Eye className="w-5 h-5 text-orange-600" />
+              <span className="text-sm font-medium">Sponsored Items</span>
+            </div>
+            <div className="text-2xl font-bold text-orange-600" data-testid="metric-sponsored-items">
+              {(analytics.adClicks?.length || 0) + (analytics.eventClicks?.length || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Active sponsored content
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sponsored Content Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sponsored Events Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Calendar className="w-5 h-5" />
+              <span>Sponsored Events Performance</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {analytics.eventClicks?.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.eventClicks.map((event: any) => (
+                  <div key={event.id} className="flex items-center justify-between p-3 border rounded">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">{event.eventName}</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(event.dateTime).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-blue-600">{event.clicks || 0} clicks</div>
+                      <div className="text-xs text-muted-foreground">${event.revenue || '0.00'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No sponsored events in this period</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sponsored Ads Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Send className="w-5 h-5" />
+              <span>Sponsored Ads Performance</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {analytics.adClicks?.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.adClicks.map((ad: any) => (
+                  <div key={ad.id} className="flex items-center justify-between p-3 border rounded">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">{ad.bizName}</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {ad.location || 'Online'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-blue-600">{ad.clicks || 0} clicks</div>
+                      <div className="text-xs text-muted-foreground">${ad.revenue || '0.00'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Send className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No sponsored ads in this period</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Click Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <MousePointer className="w-5 h-5" />
+            <span>Recent Click Activity</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {clickStats.length > 0 ? (
+            <div className="space-y-2">
+              {clickStats.slice(0, 10).map((click: any, index: number) => (
+                <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-2 h-2 rounded-full ${click.type === 'event' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                    <div>
+                      <span className="text-sm font-medium">{click.contentTitle}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({click.type === 'event' ? 'Event' : 'Ad'})
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(click.timestamp).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <MousePointer className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No click activity in this period</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("ai-settings");
 
@@ -2926,6 +3308,14 @@ export default function Admin() {
                   <Clock className="w-4 h-4 mr-2" />
                   Hours & Location
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="analytics" 
+                  className="manila-tab"
+                  data-testid="tab-analytics"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Revenue Analytics
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -2954,6 +3344,9 @@ export default function Admin() {
               </TabsContent>
               <TabsContent value="hours" className="m-0">
                 <HoursLocationTab />
+              </TabsContent>
+              <TabsContent value="analytics" className="m-0">
+                <RevenueAnalyticsTab />
               </TabsContent>
             </Card>
           </Tabs>

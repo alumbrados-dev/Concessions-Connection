@@ -34,7 +34,9 @@ export const localEvents = pgTable("local_events", {
   location: text("location").notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
+  externalUrl: text("external_url"), // External URL to open when event is clicked
   active: boolean("active").default(true),
+  sponsored: boolean("sponsored").default(false),
 });
 
 export const ads = pgTable("ads", {
@@ -45,6 +47,7 @@ export const ads = pgTable("ads", {
   link: text("link"),
   description: text("description"),
   active: boolean("active").default(true),
+  sponsored: boolean("sponsored").default(false),
 });
 
 export const orders = pgTable("orders", {
@@ -99,6 +102,24 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const adClicks = pgTable("ad_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adId: varchar("ad_id").references(() => ads.id).notNull(),
+  userId: varchar("user_id").references(() => users.id), // Optional - can be null for anonymous users
+  ipAddress: text("ip_address"), // For analytics and fraud detection
+  userAgent: text("user_agent"), // Browser/device info for analytics
+  clickedAt: timestamp("clicked_at").defaultNow(),
+});
+
+export const eventClicks = pgTable("event_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => localEvents.id).notNull(),
+  userId: varchar("user_id").references(() => users.id), // Optional - can be null for anonymous users
+  ipAddress: text("ip_address"), // For analytics and fraud detection
+  userAgent: text("user_agent"), // Browser/device info for analytics
+  clickedAt: timestamp("clicked_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -144,6 +165,16 @@ export const insertNotificationPreferencesSchema = createInsertSchema(notificati
   updatedAt: true,
 });
 
+export const insertAdClickSchema = createInsertSchema(adClicks).omit({
+  id: true,
+  clickedAt: true,
+});
+
+export const insertEventClickSchema = createInsertSchema(eventClicks).omit({
+  id: true,
+  clickedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -171,3 +202,9 @@ export type InsertEmailVerification = z.infer<typeof insertEmailVerificationSche
 
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+
+export type AdClick = typeof adClicks.$inferSelect;
+export type InsertAdClick = z.infer<typeof insertAdClickSchema>;
+
+export type EventClick = typeof eventClicks.$inferSelect;
+export type InsertEventClick = z.infer<typeof insertEventClickSchema>;

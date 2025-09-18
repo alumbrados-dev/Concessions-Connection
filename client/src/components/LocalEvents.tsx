@@ -1,6 +1,7 @@
 import { LocalEvent, Ad } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { apiRequest } from "@/lib/queryClient";
 
 interface LocalEventsProps {
   events: LocalEvent[];
@@ -12,9 +13,48 @@ export default function LocalEvents({ events, ads }: LocalEventsProps) {
     return null;
   }
 
-  const handleAdClick = (ad: Ad) => {
+  const handleAdClick = async (ad: Ad) => {
+    // Track sponsored ad clicks
+    if (ad.sponsored) {
+      try {
+        await apiRequest('/api/analytics/track-click', {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'ad',
+            contentId: ad.id,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (error) {
+        console.error('Failed to track ad click:', error);
+      }
+    }
+    
     if (ad.link) {
       window.open(ad.link, '_blank');
+    }
+  };
+
+  const handleEventClick = async (event: LocalEvent) => {
+    // Track sponsored event clicks
+    if (event.sponsored) {
+      try {
+        await apiRequest('/api/analytics/track-click', {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'event',
+            contentId: event.id,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (error) {
+        console.error('Failed to track event click:', error);
+      }
+    }
+    
+    // Open external URL if available
+    if (event.externalUrl) {
+      window.open(event.externalUrl, '_blank');
     }
   };
 
@@ -28,9 +68,15 @@ export default function LocalEvents({ events, ads }: LocalEventsProps) {
       {events.map(event => (
         <div 
           key={event.id}
-          className="bg-gradient-to-r from-secondary to-primary rounded-2xl p-4 mb-4 text-white"
+          className={`bg-gradient-to-r from-secondary to-primary rounded-2xl p-4 mb-4 text-white relative ${event.sponsored ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
+          onClick={() => event.sponsored ? handleEventClick(event) : undefined}
           data-testid={`card-event-${event.id}`}
         >
+          {event.sponsored && (
+            <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+              💰 Sponsored
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <h3 
@@ -71,7 +117,12 @@ export default function LocalEvents({ events, ads }: LocalEventsProps) {
 
       {/* Ads */}
       {ads.map(ad => (
-        <Card key={ad.id} className="mb-4" data-testid={`card-ad-${ad.id}`}>
+        <Card key={ad.id} className="mb-4 relative" data-testid={`card-ad-${ad.id}`}>
+          {ad.sponsored && (
+            <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium z-10">
+              💰 Sponsored
+            </div>
+          )}
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
               {ad.imageUrl && (

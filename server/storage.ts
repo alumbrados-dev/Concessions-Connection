@@ -1,5 +1,5 @@
-import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings, type EmailVerification, type InsertEmailVerification, type NotificationPreferences, type InsertNotificationPreferences } from "@shared/schema";
-import { db, users, items, localEvents, ads, orders, truckLocation, settings, emailVerifications, notificationPreferences } from "./lib/db";
+import { type User, type InsertUser, type Item, type InsertItem, type LocalEvent, type InsertLocalEvent, type Ad, type InsertAd, type Order, type InsertOrder, type TruckLocation, type InsertTruckLocation, type Settings, type InsertSettings, type EmailVerification, type InsertEmailVerification, type NotificationPreferences, type InsertNotificationPreferences, type AdClick, type InsertAdClick, type EventClick, type InsertEventClick } from "@shared/schema";
+import { db, users, items, localEvents, ads, orders, truckLocation, settings, emailVerifications, notificationPreferences, adClicks, eventClicks } from "./lib/db";
 import { eq, and, sql, like, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -76,6 +76,33 @@ export interface IStorage {
   getUserPointsBalance(userId: string): Promise<number>;
   awardPoints(userId: string, points: number): Promise<User | undefined>;
   getUserPointsStatus(userId: string): Promise<{ pointsEnabled: boolean; totalPoints: number } | undefined>;
+
+  // Sponsored content operations
+  updateAdSponsoredStatus(adId: string, sponsored: boolean): Promise<Ad | undefined>;
+  updateEventSponsoredStatus(eventId: string, sponsored: boolean): Promise<LocalEvent | undefined>;
+  getSponsoredAds(): Promise<Ad[]>;
+  getSponsoredEvents(): Promise<LocalEvent[]>;
+
+  // Click tracking operations
+  trackAdClick(click: InsertAdClick): Promise<AdClick>;
+  trackEventClick(click: InsertEventClick): Promise<EventClick>;
+  getAdClickCount(adId: string): Promise<number>;
+  getEventClickCount(eventId: string): Promise<number>;
+  getAdClicksByDateRange(adId: string, startDate: Date, endDate: Date): Promise<AdClick[]>;
+  getEventClicksByDateRange(eventId: string, startDate: Date, endDate: Date): Promise<EventClick[]>;
+  
+  // Analytics operations
+  getSponsoredContentAnalytics(): Promise<{
+    adClicks: { adId: string; bizName: string; clickCount: number; sponsored: boolean }[];
+    eventClicks: { eventId: string; eventName: string; clickCount: number; sponsored: boolean }[];
+    totalSponsoredAdClicks: number;
+    totalSponsoredEventClicks: number;
+  }>;
+  getRevenueAnalytics(startDate?: Date, endDate?: Date): Promise<{
+    sponsoredAdClicks: number;
+    sponsoredEventClicks: number;
+    clicksByDate: { date: string; adClicks: number; eventClicks: number }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1848,6 +1875,391 @@ export class DatabaseStorage implements IStorage {
         };
       }
       return undefined;
+    }
+  }
+
+  // Sponsored content operations
+  async updateAdSponsoredStatus(adId: string, sponsored: boolean): Promise<Ad | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const ad = this.fallbackData.ads.get(adId);
+      if (ad) {
+        ad.sponsored = sponsored;
+        this.fallbackData.ads.set(adId, ad);
+        return ad;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(ads)
+        .set({ sponsored })
+        .where(eq(ads.id, adId))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error updating ad sponsored status:', error);
+      const ad = this.fallbackData.ads.get(adId);
+      if (ad) {
+        ad.sponsored = sponsored;
+        this.fallbackData.ads.set(adId, ad);
+        return ad;
+      }
+      return undefined;
+    }
+  }
+
+  async updateEventSponsoredStatus(eventId: string, sponsored: boolean): Promise<LocalEvent | undefined> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const event = this.fallbackData.events.get(eventId);
+      if (event) {
+        event.sponsored = sponsored;
+        this.fallbackData.events.set(eventId, event);
+        return event;
+      }
+      return undefined;
+    }
+    
+    try {
+      const result = await db.update(localEvents)
+        .set({ sponsored })
+        .where(eq(localEvents.id, eventId))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error updating event sponsored status:', error);
+      const event = this.fallbackData.events.get(eventId);
+      if (event) {
+        event.sponsored = sponsored;
+        this.fallbackData.events.set(eventId, event);
+        return event;
+      }
+      return undefined;
+    }
+  }
+
+  async getSponsoredAds(): Promise<Ad[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.ads.values()).filter(ad => ad.sponsored && ad.active);
+    }
+    
+    try {
+      return await db.select().from(ads).where(and(eq(ads.sponsored, true), eq(ads.active, true)));
+    } catch (error) {
+      console.error('Error getting sponsored ads:', error);
+      return Array.from(this.fallbackData.ads.values()).filter(ad => ad.sponsored && ad.active);
+    }
+  }
+
+  async getSponsoredEvents(): Promise<LocalEvent[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return Array.from(this.fallbackData.events.values()).filter(event => event.sponsored && event.active);
+    }
+    
+    try {
+      return await db.select().from(localEvents).where(and(eq(localEvents.sponsored, true), eq(localEvents.active, true)));
+    } catch (error) {
+      console.error('Error getting sponsored events:', error);
+      return Array.from(this.fallbackData.events.values()).filter(event => event.sponsored && event.active);
+    }
+  }
+
+  // Click tracking operations
+  async trackAdClick(click: InsertAdClick): Promise<AdClick> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const clickData: AdClick = {
+        id: randomUUID(),
+        ...click,
+        clickedAt: new Date()
+      };
+      // In fallback mode, we'd store in memory if needed
+      return clickData;
+    }
+    
+    try {
+      const result = await db.insert(adClicks).values(click).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error tracking ad click:', error);
+      const clickData: AdClick = {
+        id: randomUUID(),
+        ...click,
+        clickedAt: new Date()
+      };
+      return clickData;
+    }
+  }
+
+  async trackEventClick(click: InsertEventClick): Promise<EventClick> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      const clickData: EventClick = {
+        id: randomUUID(),
+        ...click,
+        clickedAt: new Date()
+      };
+      // In fallback mode, we'd store in memory if needed
+      return clickData;
+    }
+    
+    try {
+      const result = await db.insert(eventClicks).values(click).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error tracking event click:', error);
+      const clickData: EventClick = {
+        id: randomUUID(),
+        ...click,
+        clickedAt: new Date()
+      };
+      return clickData;
+    }
+  }
+
+  async getAdClickCount(adId: string): Promise<number> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return 0; // No click tracking in fallback mode
+    }
+    
+    try {
+      const result = await db.select({ count: sql<number>`count(*)` })
+        .from(adClicks)
+        .where(eq(adClicks.adId, adId));
+      return Number(result[0]?.count) || 0;
+    } catch (error) {
+      console.error('Error getting ad click count:', error);
+      return 0;
+    }
+  }
+
+  async getEventClickCount(eventId: string): Promise<number> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return 0; // No click tracking in fallback mode
+    }
+    
+    try {
+      const result = await db.select({ count: sql<number>`count(*)` })
+        .from(eventClicks)
+        .where(eq(eventClicks.eventId, eventId));
+      return Number(result[0]?.count) || 0;
+    } catch (error) {
+      console.error('Error getting event click count:', error);
+      return 0;
+    }
+  }
+
+  async getAdClicksByDateRange(adId: string, startDate: Date, endDate: Date): Promise<AdClick[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return []; // No click tracking in fallback mode
+    }
+    
+    try {
+      return await db.select().from(adClicks)
+        .where(and(
+          eq(adClicks.adId, adId),
+          sql`${adClicks.clickedAt} >= ${startDate}`,
+          sql`${adClicks.clickedAt} <= ${endDate}`
+        ));
+    } catch (error) {
+      console.error('Error getting ad clicks by date range:', error);
+      return [];
+    }
+  }
+
+  async getEventClicksByDateRange(eventId: string, startDate: Date, endDate: Date): Promise<EventClick[]> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return []; // No click tracking in fallback mode
+    }
+    
+    try {
+      return await db.select().from(eventClicks)
+        .where(and(
+          eq(eventClicks.eventId, eventId),
+          sql`${eventClicks.clickedAt} >= ${startDate}`,
+          sql`${eventClicks.clickedAt} <= ${endDate}`
+        ));
+    } catch (error) {
+      console.error('Error getting event clicks by date range:', error);
+      return [];
+    }
+  }
+
+  // Analytics operations
+  async getSponsoredContentAnalytics(): Promise<{
+    adClicks: { adId: string; bizName: string; clickCount: number; sponsored: boolean }[];
+    eventClicks: { eventId: string; eventName: string; clickCount: number; sponsored: boolean }[];
+    totalSponsoredAdClicks: number;
+    totalSponsoredEventClicks: number;
+  }> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return {
+        adClicks: [],
+        eventClicks: [],
+        totalSponsoredAdClicks: 0,
+        totalSponsoredEventClicks: 0
+      };
+    }
+    
+    try {
+      // Get ad analytics
+      const adAnalytics = await db.select({
+        adId: ads.id,
+        bizName: ads.bizName,
+        sponsored: ads.sponsored,
+        clickCount: sql<number>`count(${adClicks.id})`
+      })
+      .from(ads)
+      .leftJoin(adClicks, eq(ads.id, adClicks.adId))
+      .groupBy(ads.id, ads.bizName, ads.sponsored);
+
+      // Get event analytics
+      const eventAnalytics = await db.select({
+        eventId: localEvents.id,
+        eventName: localEvents.eventName,
+        sponsored: localEvents.sponsored,
+        clickCount: sql<number>`count(${eventClicks.id})`
+      })
+      .from(localEvents)
+      .leftJoin(eventClicks, eq(localEvents.id, eventClicks.eventId))
+      .groupBy(localEvents.id, localEvents.eventName, localEvents.sponsored);
+
+      const sponsoredAdClicks = adAnalytics.filter(ad => ad.sponsored).reduce((sum, ad) => sum + Number(ad.clickCount), 0);
+      const sponsoredEventClicks = eventAnalytics.filter(event => event.sponsored).reduce((sum, event) => sum + Number(event.clickCount), 0);
+
+      return {
+        adClicks: adAnalytics.map(ad => ({
+          adId: ad.adId,
+          bizName: ad.bizName,
+          clickCount: Number(ad.clickCount),
+          sponsored: ad.sponsored
+        })),
+        eventClicks: eventAnalytics.map(event => ({
+          eventId: event.eventId,
+          eventName: event.eventName,
+          clickCount: Number(event.clickCount),
+          sponsored: event.sponsored
+        })),
+        totalSponsoredAdClicks: sponsoredAdClicks,
+        totalSponsoredEventClicks: sponsoredEventClicks
+      };
+    } catch (error) {
+      console.error('Error getting sponsored content analytics:', error);
+      return {
+        adClicks: [],
+        eventClicks: [],
+        totalSponsoredAdClicks: 0,
+        totalSponsoredEventClicks: 0
+      };
+    }
+  }
+
+  async getRevenueAnalytics(startDate?: Date, endDate?: Date): Promise<{
+    sponsoredAdClicks: number;
+    sponsoredEventClicks: number;
+    clicksByDate: { date: string; adClicks: number; eventClicks: number }[];
+  }> {
+    await this.ensureInitialized();
+    
+    if (this.fallbackMode) {
+      return {
+        sponsoredAdClicks: 0,
+        sponsoredEventClicks: 0,
+        clicksByDate: []
+      };
+    }
+    
+    try {
+      const dateFilter = startDate && endDate ? 
+        sql`${adClicks.clickedAt} >= ${startDate} AND ${adClicks.clickedAt} <= ${endDate}` : 
+        sql`1=1`;
+      const eventDateFilter = startDate && endDate ? 
+        sql`${eventClicks.clickedAt} >= ${startDate} AND ${eventClicks.clickedAt} <= ${endDate}` : 
+        sql`1=1`;
+
+      // Get sponsored ad clicks count
+      const sponsoredAdClicksResult = await db.select({
+        count: sql<number>`count(*)`
+      })
+      .from(adClicks)
+      .innerJoin(ads, eq(adClicks.adId, ads.id))
+      .where(and(eq(ads.sponsored, true), dateFilter));
+
+      // Get sponsored event clicks count  
+      const sponsoredEventClicksResult = await db.select({
+        count: sql<number>`count(*)`
+      })
+      .from(eventClicks)
+      .innerJoin(localEvents, eq(eventClicks.eventId, localEvents.id))
+      .where(and(eq(localEvents.sponsored, true), eventDateFilter));
+
+      // Get daily breakdown
+      const dailyAdClicks = await db.select({
+        date: sql<string>`date(${adClicks.clickedAt})`,
+        count: sql<number>`count(*)`
+      })
+      .from(adClicks)
+      .innerJoin(ads, eq(adClicks.adId, ads.id))
+      .where(and(eq(ads.sponsored, true), dateFilter))
+      .groupBy(sql`date(${adClicks.clickedAt})`);
+
+      const dailyEventClicks = await db.select({
+        date: sql<string>`date(${eventClicks.clickedAt})`,
+        count: sql<number>`count(*)`
+      })
+      .from(eventClicks)
+      .innerJoin(localEvents, eq(eventClicks.eventId, localEvents.id))
+      .where(and(eq(localEvents.sponsored, true), eventDateFilter))
+      .groupBy(sql`date(${eventClicks.clickedAt})`);
+
+      // Merge daily data
+      const dateMap = new Map<string, { adClicks: number; eventClicks: number }>();
+      dailyAdClicks.forEach(row => {
+        dateMap.set(row.date, { adClicks: Number(row.count), eventClicks: 0 });
+      });
+      dailyEventClicks.forEach(row => {
+        const existing = dateMap.get(row.date) || { adClicks: 0, eventClicks: 0 };
+        existing.eventClicks = Number(row.count);
+        dateMap.set(row.date, existing);
+      });
+
+      const clicksByDate = Array.from(dateMap.entries()).map(([date, data]) => ({
+        date,
+        adClicks: data.adClicks,
+        eventClicks: data.eventClicks
+      }));
+
+      return {
+        sponsoredAdClicks: Number(sponsoredAdClicksResult[0]?.count) || 0,
+        sponsoredEventClicks: Number(sponsoredEventClicksResult[0]?.count) || 0,
+        clicksByDate
+      };
+    } catch (error) {
+      console.error('Error getting revenue analytics:', error);
+      return {
+        sponsoredAdClicks: 0,
+        sponsoredEventClicks: 0,
+        clicksByDate: []
+      };
     }
   }
 }

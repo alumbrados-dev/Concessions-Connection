@@ -11,7 +11,9 @@ import {
   insertAdSchema,
   insertTruckLocationSchema,
   insertEmailVerificationSchema,
-  insertNotificationPreferencesSchema
+  insertNotificationPreferencesSchema,
+  insertAdClickSchema,
+  insertEventClickSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -650,6 +652,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(setting);
     } catch (error) {
       res.status(400).json({ error: "Invalid request" });
+    }
+  });
+
+  // Sponsored Content Management Routes
+  app.put("/api/admin/ads/:id/sponsored", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { sponsored } = z.object({ sponsored: z.boolean() }).parse(req.body);
+      
+      const ad = await storage.updateAdSponsoredStatus(id, sponsored);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      
+      res.json(ad);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid request" });
+    }
+  });
+
+  app.put("/api/admin/events/:id/sponsored", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { sponsored } = z.object({ sponsored: z.boolean() }).parse(req.body);
+      
+      const event = await storage.updateEventSponsoredStatus(id, sponsored);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      res.json(event);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid request" });
+    }
+  });
+
+  app.get("/api/admin/sponsored/ads", requireAdmin, async (req, res) => {
+    try {
+      const ads = await storage.getSponsoredAds();
+      res.json(ads);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sponsored ads" });
+    }
+  });
+
+  app.get("/api/admin/sponsored/events", requireAdmin, async (req, res) => {
+    try {
+      const events = await storage.getSponsoredEvents();
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sponsored events" });
+    }
+  });
+
+  // Rate limiting for click tracking to prevent abuse
+  const clickTrackingRateLimit = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 10, // Limit each IP to 10 clicks per minute
+    message: {
+      error: "Too many click tracking requests from this IP. Please slow down.",
+      retryAfter: Math.ceil(1 * 60) // seconds
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Analytics and Click Tracking Routes
+  app.post("/api/analytics/track-click", clickTrackingRateLimit, async (req, res) => {
+    try {
+      const { type, contentId, userId, ipAddress, userAgent } = z.object({
+        type: z.enum(["ad", "event"]),
+        contentId: z.string(),
+        userId: z.string().optional(),
+        ipAddress: z.string().optional(),
+        userAgent: z.string().optional()
+      }).parse(req.body);
+
+      // Get IP address from request if not provided
+      const clientIp = ipAddress || req.ip || req.connection.remoteAddress || 
+                       req.headers['x-forwarded-for']?.split(',')[0]?.trim();
+      
+      // Get user agent from request if not provided  
+      const clientUserAgent = userAgent || req.headers['user-agent'];
+
+      if (type === "ad") {
+        const click = await storage.trackAdClick({
+          adId: contentId,
+          userId: userId || null,
+          ipAddress: clientIp || null,
+          userAgent: clientUserAgent || null
+        });
+        res.json({ success: true, clickId: click.id });
+      } else {
+        const click = await storage.trackEventClick({
+          eventId: contentId,
+          userId: userId || null,
+          ipAddress: clientIp || null,
+          userAgent: clientUserAgent || null
+        });
+        res.json({ success: true, clickId: click.id });
+      }
+    } catch (error) {
+      console.error('Error tracking click:', error);
+      res.status(400).json({ error: "Invalid click tracking data" });
+    }
+  });
+
+  app.get("/api/admin/analytics/sponsored-content", requireAdmin, async (req, res) => {
+    try {
+      const analytics = await storage.getSponsoredContentAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error('Error fetching sponsored content analytics:', error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  app.get("/api/admin/analytics/revenue", requireAdmin, async (req, res) => {
+    try {
+      const { startDate, endDate } = z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional()
+      }).parse(req.query);
+
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+
+      const analytics = await storage.getRevenueAnalytics(start, end);
+      res.json(analytics);
+    } catch (error) {
+      console.error('Error fetching revenue analytics:', error);
+      res.status(500).json({ error: "Failed to fetch revenue analytics" });
+    }
+  });
+
+  app.get("/api/admin/analytics/ad-clicks/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { startDate, endDate } = z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional()
+      }).parse(req.query);
+
+      const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default 30 days ago
+      const end = endDate ? new Date(endDate) : new Date(); // Default now
+
+      const clicks = await storage.getAdClicksByDateRange(id, start, end);
+      const clickCount = await storage.getAdClickCount(id);
+      
+      res.json({ clicks, totalClicks: clickCount });
+    } catch (error) {
+      console.error('Error fetching ad click analytics:', error);
+      res.status(500).json({ error: "Failed to fetch ad click analytics" });
+    }
+  });
+
+  app.get("/api/admin/analytics/event-clicks/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { startDate, endDate } = z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional()
+      }).parse(req.query);
+
+      const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default 30 days ago
+      const end = endDate ? new Date(endDate) : new Date(); // Default now
+
+      const clicks = await storage.getEventClicksByDateRange(id, start, end);
+      const clickCount = await storage.getEventClickCount(id);
+      
+      res.json({ clicks, totalClicks: clickCount });
+    } catch (error) {
+      console.error('Error fetching event click analytics:', error);
+      res.status(500).json({ error: "Failed to fetch event click analytics" });
     }
   });
 

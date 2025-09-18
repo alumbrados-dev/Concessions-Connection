@@ -202,6 +202,7 @@ export default function BottomNavigation() {
                 </span>
               </div>
             </div>
+            <div className="mb-2">
               <span 
                 className="text-sm text-muted-foreground" 
                 data-testid="text-cart-items"
