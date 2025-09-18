@@ -810,34 +810,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // AI Hostess route
+  // AI Hostess route - integrates with OpenAI for AI hostess responses
   app.post("/api/ai/chat", async (req, res) => {
     try {
+      // Check if AI is enabled before processing
+      const aiEnabledSetting = await storage.getSetting('ai-enabled');
+      const isAIEnabled = aiEnabledSetting?.value === 'true';
+      
+      if (!isAIEnabled) {
+        return res.status(503).json({ 
+          error: "AI functionality is currently disabled",
+          message: "AI voice assistant is not available at this time. Please contact an administrator.",
+          suggestedActions: []
+        });
+      }
+
       const { message, context } = z.object({
         message: z.string(),
         context: z.object({
           currentItem: z.string().optional(),
           cartItems: z.array(z.any()).optional(),
+          menuItems: z.array(z.any()).optional()
         }).optional()
       }).parse(req.body);
 
-      // This would integrate with OpenAI
-      // For now, return a mock response
-      const responses = [
-        "Hi! Welcome to TruckEats! How can I help you today?",
-        "That's a great choice! Would you like to make that a combo with fries and a drink?",
-        "Our Classic Burger is very popular! Would you like to add some crispy fries to go with it?",
-        "I'd recommend trying our Fresh Lemonade - it's perfect with any meal!",
-      ];
-
-      const response = responses[Math.floor(Math.random() * responses.length)];
+      // Use the server-side OpenAI integration for AI hostess
+      const { generateHostessResponse } = await import('./lib/openai');
+      const response = await generateHostessResponse(message, context);
       
-      res.json({ 
-        message: response,
-        suggestedActions: ["add_combo", "view_specials", "checkout"]
-      });
+      res.json(response);
     } catch (error) {
-      res.status(400).json({ error: "Invalid request" });
+      console.error('AI chat error:', error);
+      res.status(500).json({ 
+        error: "AI service unavailable",
+        message: "I'm having trouble right now. Please try again later!",
+        suggestedActions: []
+      });
     }
   });
 

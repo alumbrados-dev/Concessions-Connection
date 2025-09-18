@@ -4,6 +4,7 @@ import { Item, LocalEvent, Ad } from "@shared/schema";
 import { realtimeConnection } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useDevice } from "@/hooks/use-device";
+import { useAISettings } from "@/hooks/use-ai-settings";
 import Header from "@/components/Header";
 import LocationBanner from "@/components/LocationBanner";
 import MenuItems from "@/components/MenuItems";
@@ -31,6 +32,7 @@ export default function Home() {
   const [showAppModal, setShowAppModal] = useState(false);
   const { toast } = useToast();
   const { isMobile, screenWidth } = useDevice();
+  const { isAIEnabled } = useAISettings();
 
   const { data: items = [], refetch: refetchItems } = useQuery<Item[]>({
     queryKey: ["/api/items"],
@@ -325,8 +327,10 @@ export default function Home() {
         />
       )}
       
-      {/* Floating AI Button */}
-      <FloatingAIButton onActivate={() => setShowVoiceAssistant(true)} />
+      {/* Floating AI Button - Only show when AI is enabled */}
+      {isAIEnabled && (
+        <FloatingAIButton onActivate={() => setShowVoiceAssistant(true)} />
+      )}
       
       {/* Modal Components */}
       <ShareModal 

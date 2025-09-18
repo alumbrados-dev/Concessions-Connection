@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useAISettings } from "@/hooks/use-ai-settings";
 
 interface FloatingAIButtonProps {
   onActivate: () => void;
@@ -8,6 +9,12 @@ interface FloatingAIButtonProps {
 export default function FloatingAIButton({ onActivate }: FloatingAIButtonProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [isPulsing, setIsPulsing] = useState(false);
+  const { isAIEnabled } = useAISettings();
+
+  // Don't render if AI is disabled
+  if (!isAIEnabled) {
+    return null;
+  }
 
   // Add a subtle pulse animation every few seconds
   useEffect(() => {

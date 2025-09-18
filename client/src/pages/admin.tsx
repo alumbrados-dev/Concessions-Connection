@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAISettings } from "@/hooks/use-ai-settings";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   MapPin, 
   Menu, 
@@ -19,8 +21,207 @@ import {
   Truck,
   Loader2,
   Navigation,
-  AlertTriangle
+  AlertTriangle,
+  Bot,
+  Zap
 } from "lucide-react";
+
+// AI Settings Tab Implementation
+function AISettingsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { isAIEnabled, isLoading, error, aiSettings } = useAISettings();
+
+  // Update AI settings mutation using apiRequest pattern
+  const updateAISettingsMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiRequest('PUT', '/api/admin/settings/ai-enabled', { value: enabled.toString() }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      const isEnabled = data?.value === 'true';
+      toast({
+        title: "AI Settings Updated",
+        description: `AI functionality has been ${isEnabled ? 'enabled' : 'disabled'}.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update AI settings. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handle AI toggle
+  const handleAIToggle = (enabled: boolean) => {
+    updateAISettingsMutation.mutate(enabled);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading AI settings...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" data-testid="alert-ai-settings-error">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Failed to Load AI Settings</AlertTitle>
+          <AlertDescription>
+            {error?.message || "Unable to fetch AI settings. Please check your connection and try again."}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold flex items-center space-x-2" data-testid="heading-ai-settings">
+            <Bot className="w-6 h-6 text-blue-600" />
+            <span>AI Settings</span>
+          </h2>
+          <p className="text-muted-foreground">Configure AI functionality and features across the application</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="ai-toggle" className="text-sm font-medium">
+            AI Functionality
+          </Label>
+          <Switch
+            id="ai-toggle"
+            checked={Boolean(isAIEnabled)}
+            onCheckedChange={handleAIToggle}
+            disabled={updateAISettingsMutation.isPending || error}
+            data-testid="switch-ai-enabled"
+            aria-label="Toggle AI functionality"
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Current Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Zap className="w-5 h-5" />
+            <span>AI Status</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">AI Functionality</Label>
+              <div className="flex items-center space-x-2 mt-1">
+                {isAIEnabled ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="text-sm font-medium text-green-600" data-testid="text-ai-status">Enabled</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                    <span className="text-sm font-medium text-red-600" data-testid="text-ai-status">Disabled</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
+              <p className="text-sm font-medium mt-1" data-testid="text-ai-last-updated">
+                {aiSettings?.updatedAt ? new Date(aiSettings.updatedAt).toLocaleString() : 'Never'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Features Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Bot className="w-5 h-5" />
+            <span>AI Features</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Voice Assistant</h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                AI-powered voice assistant that helps customers navigate the menu and place orders.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Status: {isAIEnabled ? 'Available' : 'Disabled'}
+                </span>
+                {isAIEnabled && (
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-green-600">Active</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">Smart Recommendations</h4>
+              <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+                AI analyzes customer preferences to suggest menu items and create personalized recommendations.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Status: {isAIEnabled ? 'Learning' : 'Disabled'}
+                </span>
+                {isAIEnabled && (
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-purple-600">Active</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <h4 className="font-medium text-orange-900 dark:text-orange-100 mb-2">Chat Support</h4>
+              <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
+                Intelligent chat interface provides instant answers to customer questions and order assistance.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Status: {isAIEnabled ? 'Online' : 'Disabled'}
+                </span>
+                {isAIEnabled && (
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-orange-600">Active</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {!isAIEnabled && (
+            <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                <span className="font-medium text-yellow-800 dark:text-yellow-200">AI Features Disabled</span>
+              </div>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+                Enable AI functionality above to activate voice assistant, smart recommendations, and chat support features for your customers.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 // GPS Locator Tab Implementation
 function GPSLocatorTab() {
@@ -2132,7 +2333,7 @@ function HoursLocationTab() {
 }
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState("gps");
+  const [activeTab, setActiveTab] = useState("ai-settings");
 
   // Mobile warning for smaller screens
   const MobileWarning = () => (
@@ -2186,6 +2387,14 @@ export default function Admin() {
             <div className="relative mb-6">
               <TabsList className="manila-tabs bg-transparent h-auto p-0 space-x-2">
                 <TabsTrigger 
+                  value="ai-settings" 
+                  className="manila-tab"
+                  data-testid="tab-ai-settings"
+                >
+                  <Bot className="w-4 h-4 mr-2" />
+                  AI Settings
+                </TabsTrigger>
+                <TabsTrigger 
                   value="gps" 
                   className="manila-tab"
                   data-testid="tab-gps"
@@ -2230,6 +2439,9 @@ export default function Admin() {
 
             {/* Tab Content Area */}
             <Card className="manila-content bg-amber-50 dark:bg-gray-800 border-2 border-amber-200 dark:border-gray-700">
+              <TabsContent value="ai-settings" className="m-0">
+                <AISettingsTab />
+              </TabsContent>
               <TabsContent value="gps" className="m-0">
                 <GPSLocatorTab />
               </TabsContent>

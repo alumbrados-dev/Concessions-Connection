@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Item } from "@shared/schema";
 import { useVoice } from "@/hooks/use-voice";
 import { useCart } from "@/hooks/use-cart";
+import { useAISettings } from "@/hooks/use-ai-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { AlertTriangle } from "lucide-react";
 
 interface VoiceAssistantProps {
   items: Item[];
@@ -14,6 +16,7 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
   const [message, setMessage] = useState("Hi! Welcome to Concessions Connection! How can I help you today?");
   const [suggestedActions, setSuggestedActions] = useState<string[]>(["view_specials"]);
   const { items: cartItems } = useCart();
+  const { isAIEnabled, isLoading: isAILoading } = useAISettings();
 
   const { 
     isListening, 
@@ -31,11 +34,20 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
   });
 
   useEffect(() => {
-    // Speak initial greeting
-    speak(message);
-  }, []);
+    // Only speak initial greeting if AI is enabled
+    if (isAIEnabled && !isAILoading) {
+      speak(message);
+    } else if (!isAIEnabled) {
+      setMessage("AI voice assistant is currently disabled. Please contact an administrator to enable AI features.");
+    }
+  }, [isAIEnabled, isAILoading, speak]);
 
   async function handleTranscription(text: string) {
+    if (!isAIEnabled) {
+      setMessage("AI functionality is currently disabled. Please contact an administrator to enable AI features.");
+      return;
+    }
+
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -136,6 +148,18 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
               {message}
             </p>
           </div>
+
+          {!isAIEnabled && (
+            <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">AI Features Disabled</span>
+              </div>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                Contact an administrator to enable AI voice assistance.
+              </p>
+            </div>
+          )}
           
           <div className="flex flex-wrap gap-2 mb-3">
             {suggestedActions.map(action => (
@@ -155,11 +179,11 @@ export default function VoiceAssistant({ items, onClose }: VoiceAssistantProps) 
             <Button 
               className="flex-1"
               onClick={isListening ? stopListening : startListening}
-              disabled={isProcessing}
+              disabled={isProcessing || !isAIEnabled}
               data-testid="button-voice-toggle"
             >
               <i className={`fas ${isListening ? 'fa-stop' : 'fa-microphone'} mr-2`}></i>
-              {isListening ? 'Stop' : 'Talk'}
+              {!isAIEnabled ? 'AI Disabled' : (isListening ? 'Stop' : 'Talk')}
             </Button>
           </div>
         </CardContent>

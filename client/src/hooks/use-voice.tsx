@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { transcribeAudio, textToSpeech } from "@/lib/openai";
+import { useAISettings } from "@/hooks/use-ai-settings";
 
 export interface UseVoiceOptions {
   onTranscription?: (text: string) => void;
@@ -10,12 +11,18 @@ export function useVoice(options: UseVoiceOptions = {}) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const { isAIEnabled } = useAISettings();
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const startListening = useCallback(async () => {
+    if (!isAIEnabled) {
+      options.onError?.(new Error('AI functionality is currently disabled'));
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -48,7 +55,7 @@ export function useVoice(options: UseVoiceOptions = {}) {
     } catch (error) {
       options.onError?.(error as Error);
     }
-  }, [options]);
+  }, [options, isAIEnabled]);
 
   const stopListening = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -58,6 +65,11 @@ export function useVoice(options: UseVoiceOptions = {}) {
   }, []);
 
   const speak = useCallback(async (text: string) => {
+    if (!isAIEnabled) {
+      options.onError?.(new Error('AI functionality is currently disabled'));
+      return;
+    }
+
     try {
       setIsSpeaking(true);
       const audioBlob = await textToSpeech(text);
@@ -80,7 +92,7 @@ export function useVoice(options: UseVoiceOptions = {}) {
       setIsSpeaking(false);
       options.onError?.(error as Error);
     }
-  }, [options]);
+  }, [options, isAIEnabled]);
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -97,6 +109,7 @@ export function useVoice(options: UseVoiceOptions = {}) {
     startListening,
     stopListening,
     speak,
-    stopSpeaking
+    stopSpeaking,
+    isAIEnabled
   };
 }
